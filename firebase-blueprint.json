@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with roles and basic info",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "nickname": { "type": "string", "description": "Unique user nickname" },
+        "email": { "type": "string", "description": "User email" },
+        "role": { "type": "string", "enum": ["admin", "moderator", "user"], "description": "User role for RBAC" },
+        "createdAt": { "type": "integer", "description": "Account creation timestamp (ms)" }
+      },
+      "required": ["uid", "nickname", "email", "role"]
+    },
+    "PromoCode": {
+      "title": "PromoCode",
+      "description": "Promotional code for search attempts",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "The promo code string" },
+        "expiresAt": { "type": "integer", "description": "Expiration timestamp (ms)" },
+        "maxAttempts": { "type": "integer", "description": "Number of search attempts allowed" },
+        "createdBy": { "type": "string", "description": "UID of the admin/moderator who created it" },
+        "createdAt": { "type": "integer", "description": "Creation timestamp (ms)" }
+      },
+      "required": ["code", "expiresAt", "maxAttempts", "createdBy"]
+    },
+    "UserLog": {
+      "title": "UserLog",
+      "description": "System logs for user actions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "action": { "type": "string", "description": "Action performed" },
+        "details": { "type": "object", "description": "Additional action details" },
+        "timestamp": { "type": "integer", "description": "Log timestamp (ms)" }
+      },
+      "required": ["userId", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/promocodes/{code}": {
+      "schema": "PromoCode",
+      "description": "Available promo codes"
+    },
+    "/user_logs/{logId}": {
+      "schema": "UserLog",
+      "description": "System logs"
+    }
+  }
+}
