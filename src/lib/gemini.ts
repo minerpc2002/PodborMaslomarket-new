@@ -2,6 +2,18 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { fetchRavenolData } from './ravenol';
 import { CarData } from '../types';
 import { decodeVin } from './vinApi';
+import { useAppStore } from '../store/useAppStore';
+
+function isStaffUser() {
+  try {
+    const state = useAppStore.getState();
+    const role = state.userProfile?.role;
+    const email = state.userProfile?.email?.toLowerCase() || '';
+    return role === 'admin' || role === 'moderator' || email === 'minerpc2002@gmail.com';
+  } catch (e) {
+    return false;
+  }
+}
 
 const productSchema = {
   type: Type.OBJECT,
@@ -96,7 +108,7 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
   const openRouterModels = [
     "qwen/qwen-2.5-72b-instruct:free",
     "google/gemini-2.5-flash-free",
-    "meta-llama/llama-3.3-70b-instruct:free"
+    "mistralai/mistral-7b-instruct:free"
   ];
 
   let lastError = null;
@@ -155,7 +167,12 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
   }
 
   // If all models failed
-  throw lastError || new Error("All OpenRouter free models failed.");
+  const errorMsg = lastError?.message || "All OpenRouter free models failed.";
+  if (isStaffUser()) {
+    throw new Error(`Ошибка резервных ИИ: ${errorMsg}`);
+  } else {
+    throw new Error("Сервис временно недоступен из-за высокой нагрузки. Пожалуйста, попробуйте позже.");
+  }
 }
 
 async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<any> {
@@ -193,10 +210,14 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
           return orResponse;
         } catch (orError: any) {
           console.error('OpenRouter fallback failed after region block:', orError.message);
-          if (orError.message.includes('User not found') || orError.message.includes('401')) {
-            throw new Error('Ошибка: Резервный ключ OpenRouter недействителен. Пожалуйста, создайте бесплатный ключ на openrouter.ai и добавьте его в настройки (VITE_OPENROUTER_API_KEY).');
+          if (isStaffUser()) {
+            if (orError.message.includes('User not found') || orError.message.includes('401')) {
+              throw new Error('Ошибка: Резервный ключ OpenRouter недействителен. Пожалуйста, создайте бесплатный ключ на openrouter.ai и добавьте его в настройки (VITE_OPENROUTER_API_KEY).');
+            }
+            throw new Error(`Gemini недоступен в вашем регионе, а резервные ИИ-модели вернули ошибку: ${orError.message}`);
+          } else {
+            throw new Error("Сервис временно недоступен из-за высокой нагрузки. Пожалуйста, попробуйте позже.");
           }
-          throw new Error(`Gemini недоступен в вашем регионе, а резервные ИИ-модели вернули ошибку: ${orError.message}`);
         }
       }
 
@@ -207,10 +228,14 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
                            errorMsg.includes('PERMISSION_DENIED');
       
       if (isClientError && !isQuotaError) {
-        if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('API key not valid')) {
-          throw new Error('Указан неверный API ключ Gemini. Проверьте правильность ключа в Vercel (VITE_GEMINI_API_KEY).');
+        if (isStaffUser()) {
+          if (errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('API key not valid')) {
+            throw new Error('Указан неверный API ключ Gemini. Проверьте правильность ключа в Vercel (VITE_GEMINI_API_KEY).');
+          }
+          throw new Error(`Ошибка запроса к ИИ: ${errorMsg.substring(0, 100)}...`); // Don't retry on fatal client errors
+        } else {
+          throw new Error("Внутренняя ошибка сервиса. Пожалуйста, обратитесь в поддержку.");
         }
-        throw new Error(`Ошибка запроса к ИИ: ${errorMsg.substring(0, 100)}...`); // Don't retry on fatal client errors
       }
 
       // Rotate immediately on error
@@ -234,11 +259,20 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
         return orResponse;
       } catch (orError: any) {
         console.error('OpenRouter fallback also failed:', orError.message);
-        throw new Error(`Все ИИ-модели (Gemini и OpenRouter) недоступны: ${errorMsg}`);
+        if (isStaffUser()) {
+          throw new Error(`Все ИИ-модели (Gemini и OpenRouter) недоступны: ${errorMsg} | ${orError.message}`);
+        } else {
+          throw new Error("Сервис временно недоступен из-за высокой нагрузки. Пожалуйста, попробуйте позже.");
+        }
       }
     }
   }
-  throw new Error('Все доступные модели ИИ временно перегружены или исчерпали лимит. Пожалуйста, попробуйте через минуту.');
+  
+  if (isStaffUser()) {
+    throw new Error('Все доступные модели ИИ временно перегружены или исчерпали лимит. Пожалуйста, попробуйте через минуту.');
+  } else {
+    throw new Error('Сервис временно недоступен из-за высокой нагрузки. Пожалуйста, попробуйте позже.');
+  }
 }
 
 async function getGeminiVinHint(ai: any, vin: string): Promise<string | null> {
