@@ -181,6 +181,22 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
                           errorMsg.includes('RESOURCE_EXHAUSTED') ||
                           errorMsg.includes('Too Many Requests');
 
+      const isLocationError = errorMsg.includes('User location is not supported') || 
+                              errorMsg.includes('location is not supported');
+
+      if (isLocationError) {
+        console.warn('Gemini is not available in this region. Switching to OpenRouter immediately...');
+        try {
+          const prompt = typeof params.contents === 'string' ? params.contents : JSON.stringify(params.contents);
+          const orResponse = await callOpenRouter(prompt, params.config?.responseSchema);
+          console.log('OpenRouter fallback successful (Region Block Bypass)!');
+          return orResponse;
+        } catch (orError: any) {
+          console.error('OpenRouter fallback failed after region block:', orError.message);
+          throw new Error(`Gemini недоступен в вашем регионе, а резервные ИИ-модели вернули ошибку: ${orError.message}`);
+        }
+      }
+
       const isClientError = errorMsg.includes('400') || 
                            errorMsg.includes('INVALID_ARGUMENT') ||
                            errorMsg.includes('401') ||
