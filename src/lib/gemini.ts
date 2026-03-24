@@ -93,51 +93,69 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
     apiKey = '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';
   }
 
-  console.log('Calling OpenRouter (MiniMax m2.5)...');
-  
-  const finalPrompt = schema 
-    ? `${prompt}\n\nIMPORTANT: Return ONLY a valid JSON object matching this schema: ${JSON.stringify(schema)}. Do not include any other text or markdown formatting.`
-    : prompt;
+  const openRouterModels = [
+    "qwen/qwen-2.5-72b-instruct:free",
+    "google/gemini-2.5-flash-free",
+    "meta-llama/llama-3.3-70b-instruct:free"
+  ];
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "HTTP-Referer": window.location.origin,
-      "X-Title": "Oil Selector App",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      "model": "minimax/minimax-01", 
-      "messages": [
-        { "role": "system", "content": "You are a professional automotive technical assistant. Always respond in Russian." },
-        { "role": "user", "content": finalPrompt }
-      ],
-      "temperature": 0.3,
-      "response_format": schema ? { "type": "json_object" } : undefined
-    })
-  });
+  let lastError = null;
 
-  if (!response.ok) {
-    const error = await response.json();
-    console.error('OpenRouter API Error:', error);
-    throw new Error(`OpenRouter error: ${error.error?.message || response.statusText}`);
+  for (const modelName of openRouterModels) {
+    console.log(`Calling OpenRouter (${modelName})...`);
+    
+    const finalPrompt = schema 
+      ? `${prompt}\n\nIMPORTANT: Return ONLY a valid JSON object matching this schema: ${JSON.stringify(schema)}. Do not include any other text or markdown formatting.`
+      : prompt;
+
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Oil Selector App",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          "model": modelName, 
+          "messages": [
+            { "role": "system", "content": "You are a professional automotive technical assistant. Always respond in Russian. If JSON is requested, output ONLY valid JSON." },
+            { "role": "user", "content": finalPrompt }
+          ],
+          "temperature": 0.3
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.warn(`OpenRouter API Error for ${modelName}:`, error);
+        lastError = new Error(`OpenRouter error (${modelName}): ${error.error?.message || response.statusText}`);
+        continue; // Try next model
+      }
+
+      const data = await response.json();
+      let text = data.choices[0].message.content;
+      
+      // Clean up potential markdown code blocks if the model ignored the instruction
+      if (text.includes('```json')) {
+        text = text.split('```json')[1].split('```')[0].trim();
+      } else if (text.includes('```')) {
+        text = text.split('```')[1].split('```')[0].trim();
+      }
+      
+      return {
+        text,
+        candidates: [{ content: { parts: [{ text }] } }]
+      };
+    } catch (err) {
+      console.warn(`Failed to call ${modelName}:`, err);
+      lastError = err;
+    }
   }
 
-  const data = await response.json();
-  let text = data.choices[0].message.content;
-  
-  // Clean up potential markdown code blocks if the model ignored the instruction
-  if (text.includes('```json')) {
-    text = text.split('```json')[1].split('```')[0].trim();
-  } else if (text.includes('```')) {
-    text = text.split('```')[1].split('```')[0].trim();
-  }
-  
-  return {
-    text,
-    candidates: [{ content: { parts: [{ text }] } }]
-  };
+  // If all models failed
+  throw lastError || new Error("All OpenRouter free models failed.");
 }
 
 async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<any> {
