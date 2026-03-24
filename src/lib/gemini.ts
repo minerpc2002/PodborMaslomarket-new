@@ -106,7 +106,7 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
   }
 
   const openRouterModels = [
-    "stepfun/step-1-flash"
+    "stepfun/step-3.5-flash"
   ];
 
   let lastError = null;
