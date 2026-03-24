@@ -193,6 +193,9 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
           return orResponse;
         } catch (orError: any) {
           console.error('OpenRouter fallback failed after region block:', orError.message);
+          if (orError.message.includes('User not found') || orError.message.includes('401')) {
+            throw new Error('Ошибка: Резервный ключ OpenRouter недействителен. Пожалуйста, создайте бесплатный ключ на openrouter.ai и добавьте его в настройки (VITE_OPENROUTER_API_KEY).');
+          }
           throw new Error(`Gemini недоступен в вашем регионе, а резервные ИИ-модели вернули ошибку: ${orError.message}`);
         }
       }
