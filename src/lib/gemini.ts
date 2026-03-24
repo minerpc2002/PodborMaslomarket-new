@@ -106,9 +106,7 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
   }
 
   const openRouterModels = [
-    "qwen/qwen-2.5-72b-instruct:free",
-    "google/gemini-2.5-flash-free",
-    "mistralai/mistral-7b-instruct:free"
+    "qwen/qwen-2.5-coder-32b-instruct:free"
   ];
 
   let lastError = null;
