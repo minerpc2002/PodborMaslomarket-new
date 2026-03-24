@@ -50,6 +50,7 @@ export default function Dashboard() {
 
     setLoading(true);
     try {
+      console.log('Fetching dashboard data...');
       const usersSnap = await getDocs(collection(db, 'users'));
       const usersList = usersSnap.docs.map(doc => doc.data() as UserProfile);
       setUsers(usersList.sort((a, b) => b.createdAt - a.createdAt));
@@ -57,6 +58,7 @@ export default function Dashboard() {
       const promoSnap = await getDocs(query(collection(db, 'promocodes'), orderBy('createdAt', 'desc')));
       const promoList = promoSnap.docs.map(doc => doc.data() as PromoCode);
       setPromoCodes(promoList);
+      console.log(`Fetched ${usersList.length} users and ${promoList.length} promo codes.`);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -192,7 +194,7 @@ export default function Dashboard() {
             <>
               <TabsTrigger value="users" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
                 <Users size={18} />
-                <span>Пользователи</span>
+                <span>Пользователи ({users.length})</span>
               </TabsTrigger>
               <TabsTrigger value="promo" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
                 <Ticket size={18} />
@@ -246,9 +248,21 @@ export default function Dashboard() {
           <>
             <TabsContent value="users">
               <Card className="liquid-glass border-none">
-                <CardHeader>
-                  <CardTitle>Пользователи системы</CardTitle>
-                  <CardDescription>Список всех зарегистрированных пользователей</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>Пользователи системы</CardTitle>
+                    <CardDescription>Список всех зарегистрированных пользователей</CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fetchData}
+                    className="border-white/10 hover:bg-white/5"
+                    disabled={loading}
+                  >
+                    <Loader2 className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    Обновить
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col sm:flex-row gap-4 mb-6">

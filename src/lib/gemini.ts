@@ -76,7 +76,7 @@ function getGeminiClient() {
 const FREE_MODELS = [
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite-preview',
-  'gemini-2.5-flash'
+  'gemini-3.1-pro-preview'
 ];
 
 let currentModelIndex = 0; // Global rotation index
@@ -95,6 +95,10 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
 
   console.log('Calling OpenRouter (MiniMax m2.5)...');
   
+  const finalPrompt = schema 
+    ? `${prompt}\n\nIMPORTANT: Return ONLY a valid JSON object matching this schema: ${JSON.stringify(schema)}. Do not include any other text or markdown formatting.`
+    : prompt;
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -104,25 +108,34 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      "model": "minimax/minimax-01", // MiniMax m2.5 (free) on OpenRouter
+      "model": "minimax/minimax-01", 
       "messages": [
-        { "role": "user", "content": prompt }
+        { "role": "system", "content": "You are a professional automotive technical assistant. Always respond in Russian." },
+        { "role": "user", "content": finalPrompt }
       ],
+      "temperature": 0.3,
       "response_format": schema ? { "type": "json_object" } : undefined
     })
   });
 
   if (!response.ok) {
     const error = await response.json();
+    console.error('OpenRouter API Error:', error);
     throw new Error(`OpenRouter error: ${error.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
-  const text = data.choices[0].message.content;
+  let text = data.choices[0].message.content;
+  
+  // Clean up potential markdown code blocks if the model ignored the instruction
+  if (text.includes('```json')) {
+    text = text.split('```json')[1].split('```')[0].trim();
+  } else if (text.includes('```')) {
+    text = text.split('```')[1].split('```')[0].trim();
+  }
   
   return {
     text,
-    // Mocking the Gemini response structure for compatibility
     candidates: [{ content: { parts: [{ text }] } }]
   };
 }
@@ -169,20 +182,22 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
       
       if (attempt < totalAttempts) {
         // Small delay before retry (shorter for quota errors to quickly switch)
-        const delay = isQuotaError ? 500 : Math.pow(2, Math.floor(attempt / FREE_MODELS.length)) * 1000;
-        console.warn(`Переключение на модель ${FREE_MODELS[currentModelIndex]} через ${delay}ms...`);
+        const delay = isQuotaError ? 300 : Math.pow(2, Math.floor(attempt / FREE_MODELS.length)) * 1000;
+        console.warn(`Переключение на модель ${FREE_MODELS[currentModelIndex]} через ${delay}ms... (Попытка ${attempt + 1}/${totalAttempts})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
       // If all Gemini models failed, try OpenRouter as a last resort
-      console.warn('All Gemini models failed. Switching to OpenRouter fallback...');
+      console.warn('Все модели Gemini исчерпаны. Переключение на OpenRouter (MiniMax)...');
       try {
         const prompt = typeof params.contents === 'string' ? params.contents : JSON.stringify(params.contents);
-        return await callOpenRouter(prompt, params.config?.responseSchema);
+        const orResponse = await callOpenRouter(prompt, params.config?.responseSchema);
+        console.log('OpenRouter fallback successful!');
+        return orResponse;
       } catch (orError: any) {
         console.error('OpenRouter fallback also failed:', orError.message);
-        throw error; // Throw the original Gemini error if fallback also fails
+        throw new Error(`Все ИИ-модели (Gemini и OpenRouter) недоступны: ${errorMsg}`);
       }
     }
   }
