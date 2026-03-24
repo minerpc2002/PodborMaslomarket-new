@@ -106,7 +106,7 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
   }
 
   const openRouterModels = [
-    "qwen/qwen-2.5-coder-32b-instruct:free"
+    "stepfun/step-1-flash"
   ];
 
   let lastError = null;
