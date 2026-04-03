@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -17,6 +17,13 @@ interface SupportMessage {
   text: string;
   isAdmin: boolean;
   timestamp: number;
+}
+
+interface SupportChat {
+  userId: string;
+  status: 'open' | 'closed';
+  closedAt?: number;
+  lastMessageAt?: number;
 }
 
 import { cn } from '../lib/utils';
@@ -44,6 +51,7 @@ export default function Dashboard() {
 
   // Support Chat State
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [supportChats, setSupportChats] = useState<Record<string, SupportChat>>({});
   const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
   const [adminReply, setAdminReply] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -105,18 +113,32 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isStaff) return;
 
-    // Clean up old messages (older than 24 hours)
+    // Clean up old messages (only if chat is closed and closedAt is > 24h ago)
     const cleanupOldMessages = async () => {
       try {
         const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-        const q = query(
-          collection(db, 'support_messages'),
-          where('timestamp', '<', twentyFourHoursAgo)
+        
+        // Find closed chats that were closed more than 24h ago
+        const closedChatsQuery = query(
+          collection(db, 'support_chats'),
+          where('status', '==', 'closed'),
+          where('closedAt', '<', twentyFourHoursAgo)
         );
-        const snapshot = await getDocs(q);
-        snapshot.forEach(async (docSnap) => {
-          await deleteDoc(docSnap.ref);
-        });
+        const closedChatsSnap = await getDocs(closedChatsQuery);
+        
+        for (const chatDoc of closedChatsSnap.docs) {
+          const userId = chatDoc.id;
+          console.log('Cleaning up expired support chat for user:', userId);
+          
+          // Delete all messages for this user
+          const msgsQuery = query(collection(db, 'support_messages'), where('userId', '==', userId));
+          const msgsSnap = await getDocs(msgsQuery);
+          const deleteMsgsPromises = msgsSnap.docs.map(d => deleteDoc(d.ref));
+          await Promise.all(deleteMsgsPromises);
+          
+          // Delete the chat status doc
+          await deleteDoc(chatDoc.ref);
+        }
       } catch (err) {
         console.error('Error cleaning up messages:', err);
       }
@@ -133,7 +155,19 @@ export default function Dashboard() {
       setSupportMessages(msgs);
     });
 
-    return () => unsubscribe();
+    // Listen to all support chats
+    const chatsUnsubscribe = onSnapshot(collection(db, 'support_chats'), (snapshot) => {
+      const chats: Record<string, SupportChat> = {};
+      snapshot.docs.forEach(doc => {
+        chats[doc.id] = doc.data() as SupportChat;
+      });
+      setSupportChats(chats);
+    });
+
+    return () => {
+      unsubscribe();
+      chatsUnsubscribe();
+    };
   }, [isStaff]);
 
   const handleToggleAiSearch = async () => {
@@ -255,16 +289,40 @@ export default function Dashboard() {
 
     setActionLoading('reply');
     try {
+      const timestamp = Date.now();
+      
+      // Ensure chat is open when admin replies
+      await setDoc(doc(db, 'support_chats', activeChatUserId), {
+        userId: activeChatUserId,
+        status: 'open',
+        lastMessageAt: timestamp
+      }, { merge: true });
+
       await addDoc(collection(db, 'support_messages'), {
         userId: activeChatUserId,
         senderId: userProfile.uid,
         text: adminReply.trim(),
         isAdmin: true,
-        timestamp: Date.now()
+        timestamp
       });
       setAdminReply('');
     } catch (err) {
       console.error('Error sending reply:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCloseChat = async (userId: string) => {
+    if (!isStaff) return;
+    setActionLoading('close-chat');
+    try {
+      await setDoc(doc(db, 'support_chats', userId), {
+        status: 'closed',
+        closedAt: Date.now()
+      }, { merge: true });
+    } catch (err) {
+      console.error('Error closing chat:', err);
     } finally {
       setActionLoading(null);
     }
@@ -328,10 +386,10 @@ export default function Dashboard() {
                 <Ticket size={18} />
                 <span>Промокоды</span>
               </TabsTrigger>
-              <TabsTrigger value="support" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap relative">
+                          <TabsTrigger value="support" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap relative">
                 <MessageSquare size={18} />
                 <span>Поддержка</span>
-                {Object.keys(chatsByUser).length > 0 && (
+                {Object.values(supportChats).some((c: SupportChat) => c.status === 'open') && (
                   <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                 )}
               </TabsTrigger>
@@ -646,15 +704,24 @@ export default function Dashboard() {
                           const lastMsg = (msgs as SupportMessage[])[(msgs as SupportMessage[]).length - 1];
                           const user = users.find(u => u.uid === userId);
                           const nickname = user?.nickname || 'Неизвестный пользователь';
+                          const chat = supportChats[userId];
+                          const isClosed = chat?.status === 'closed';
                           
                           return (
                             <button
                               key={userId}
                               onClick={() => setActiveChatUserId(userId)}
-                              className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${activeChatUserId === userId ? 'bg-blue-900/20' : ''}`}
+                              className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${activeChatUserId === userId ? 'bg-blue-900/20' : ''} ${isClosed ? 'opacity-50' : ''}`}
                             >
                               <div className="flex justify-between items-start mb-1">
-                                <span className="font-bold text-sm text-zinc-200 truncate">{nickname}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-zinc-200 truncate">{nickname}</span>
+                                  {isClosed && (
+                                    <span className="text-[8px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 uppercase font-black">
+                                      Закрыт
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-zinc-500 shrink-0">
                                   {new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
@@ -673,11 +740,25 @@ export default function Dashboard() {
                   <div className="flex-1 flex flex-col bg-black/20">
                     {activeChatUserId ? (
                       <>
-                        <div className="p-4 border-b border-white/5 bg-zinc-900/50">
-                          <h3 className="font-bold text-zinc-200">
-                            {users.find(u => u.uid === activeChatUserId)?.nickname || 'Пользователь'}
-                          </h3>
-                          <p className="text-xs text-zinc-500">{users.find(u => u.uid === activeChatUserId)?.email}</p>
+                        <div className="p-4 border-b border-white/5 bg-zinc-900/50 flex justify-between items-center">
+                          <div>
+                            <h3 className="font-bold text-zinc-200">
+                              {users.find(u => u.uid === activeChatUserId)?.nickname || 'Пользователь'}
+                            </h3>
+                            <p className="text-xs text-zinc-500">{users.find(u => u.uid === activeChatUserId)?.email}</p>
+                          </div>
+                          {supportChats[activeChatUserId]?.status !== 'closed' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCloseChat(activeChatUserId)}
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                              disabled={actionLoading === 'close-chat'}
+                            >
+                              {actionLoading === 'close-chat' ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="mr-2" />}
+                              Закрыть чат
+                            </Button>
+                          )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                           {activeChatMessages.map((msg) => {

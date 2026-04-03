@@ -139,5 +139,10 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isStaff();
     }
+
+    match /support_chats/{userId} {
+      allow read: if isStaff() || isOwner(userId);
+      allow write: if isStaff() || isOwner(userId);
+    }
   }
 }

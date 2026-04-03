@@ -61,6 +61,18 @@
         "timestamp": { "type": "integer", "description": "Message timestamp (ms)" }
       },
       "required": ["userId", "senderId", "text", "isAdmin", "timestamp"]
+    },
+    "SupportChat": {
+      "title": "SupportChat",
+      "description": "Status of a support chat for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "status": { "type": "string", "enum": ["open", "closed"], "description": "Current status of the chat" },
+        "closedAt": { "type": "integer", "description": "Timestamp when the chat was closed (ms)" },
+        "lastMessageAt": { "type": "integer", "description": "Timestamp of the last message (ms)" }
+      },
+      "required": ["userId", "status"]
     }
   },
   "firestore": {
@@ -83,6 +95,10 @@
     "/support_messages/{messageId}": {
       "schema": "SupportMessage",
       "description": "Support chat messages"
+    },
+    "/support_chats/{userId}": {
+      "schema": "SupportChat",
+      "description": "Support chat status tracking"
     }
   }
 }
