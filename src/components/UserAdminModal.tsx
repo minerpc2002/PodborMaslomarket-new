@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, PromoCode, UserRole, CarData } from '../types';
 import { db } from '../firebase';
-import { doc, updateDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { X, Shield, ShieldAlert, ShieldCheck, Users, Ticket, Clock, Search, Loader2, Activity } from 'lucide-react';
+import { X, Shield, ShieldAlert, ShieldCheck, Users, Ticket, Clock, Search, Loader2, Activity, Trash2 } from 'lucide-react';
 import { UserLog } from '../lib/logger';
+
+import { cn } from '../lib/utils';
 
 interface UserAdminModalProps {
   user: UserProfile;
@@ -24,6 +26,8 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, is
   // PRO grant state
   const [proDays, setProDays] = useState('7');
   const [proAttempts, setProAttempts] = useState('10');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -106,6 +110,39 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, is
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!isAdmin) return;
+    
+    setLoading(true);
+    setDeleteError(null);
+    try {
+      console.log(`Attempting to delete user: ${user.uid} (${user.nickname})`);
+      
+      // 1. Delete user document from Firestore
+      await deleteDoc(doc(db, 'users', user.uid));
+      console.log('User document deleted');
+      
+      // 2. Delete nickname document to free it up
+      if (user.nickname) {
+        await deleteDoc(doc(db, 'nicknames', user.nickname));
+        console.log('Nickname document deleted');
+      }
+      
+      // 3. Optional: Delete logs and messages? 
+      // For now, just reload to refresh the list
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      setDeleteError(err.message || 'Ошибка при удалении пользователя');
+    } finally {
+      setLoading(false);
+      // We don't hide the confirm if there's an error, so the user can see it
+      if (!deleteError) {
+        setShowDeleteConfirm(false);
+      }
+    }
+  };
+
   const isProActive = user.activePromoCode && user.activePromoCode.expiresAt > Date.now();
 
   return (
@@ -121,7 +158,7 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, is
         
         <CardHeader className="pb-4 pt-10">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
+            <div className={cn("w-16 h-16 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center overflow-hidden shrink-0", isProActive && "pro-avatar-border")}>
               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.nickname}`} alt="Avatar" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0">
@@ -274,14 +311,62 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, is
             )}
           </div>
 
-          <div className="pt-4">
-            <Button 
-              variant="outline" 
-              className="w-full border-zinc-700 text-zinc-400 hover:text-white"
-              onClick={onClose}
-            >
-              Закрыть
-            </Button>
+          <div className="pt-4 flex flex-col gap-2">
+            {isAdmin && !showDeleteConfirm && (
+              <Button 
+                variant="destructive" 
+                className="w-full bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={loading}
+              >
+                <Trash2 size={16} className="mr-2" /> Удалить пользователя
+              </Button>
+            )}
+
+            {showDeleteConfirm && (
+              <div className="bg-red-900/20 p-4 rounded-xl border border-red-500/30 space-y-3 animate-in fade-in slide-in-from-top-2">
+                <p className="text-sm text-red-400 font-bold text-center">
+                  Вы уверены? Это действие необратимо.
+                </p>
+                {deleteError && (
+                  <p className="text-xs text-red-500 bg-black/40 p-2 rounded border border-red-500/20">
+                    Ошибка: {deleteError}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <Button 
+                    variant="destructive" 
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                    onClick={handleDeleteUser}
+                    disabled={loading}
+                  >
+                    {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
+                    Да, удалить
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 border-zinc-700 text-zinc-400"
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setDeleteError(null);
+                    }}
+                    disabled={loading}
+                  >
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!showDeleteConfirm && (
+              <Button 
+                variant="outline" 
+                className="w-full border-zinc-700 text-zinc-400 hover:text-white"
+                onClick={onClose}
+              >
+                Закрыть
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -15,6 +15,15 @@ function isStaffUser() {
   }
 }
 
+function isAiSearchEnabledState() {
+  try {
+    const state = useAppStore.getState();
+    return state.isAiSearchEnabled;
+  } catch (e) {
+    return true;
+  }
+}
+
 const productSchema = {
   type: Type.OBJECT,
   properties: {
@@ -200,6 +209,9 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
                               errorMsg.includes('location is not supported');
 
       if (isLocationError) {
+        if (!isAiSearchEnabledState()) {
+          throw new Error('Gemini недоступен в вашем регионе, а резервный ИИ (OpenRouter) временно отключен администратором.');
+        }
         console.warn('Gemini is not available in this region. Switching to OpenRouter immediately...');
         try {
           const prompt = typeof params.contents === 'string' ? params.contents : JSON.stringify(params.contents);
@@ -249,6 +261,9 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
       }
       
       // If all Gemini models failed, try OpenRouter as a last resort
+      if (!isAiSearchEnabledState()) {
+        throw new Error('Все модели Gemini исчерпаны, а резервный ИИ (OpenRouter) временно отключен администратором.');
+      }
       console.warn('Все модели Gemini исчерпаны. Переключение на OpenRouter (MiniMax)...');
       try {
         const prompt = typeof params.contents === 'string' ? params.contents : JSON.stringify(params.contents);

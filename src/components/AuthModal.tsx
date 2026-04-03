@@ -3,9 +3,17 @@ import { useAppStore } from '../store/useAppStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { ShieldCheck, User, LogIn, Loader2 } from 'lucide-react';
+import { ShieldCheck, User, LogIn, Loader2, Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  signOut, 
+  getRedirectResult,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword
+} from 'firebase/auth';
 import { doc, getDoc, setDoc, runTransaction, Timestamp } from 'firebase/firestore';
 import { UserProfile, PromoCode } from '../types';
 
@@ -19,6 +27,12 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false);
   const [needsNickname, setNeedsNickname] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'social'>('social');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const error = localError || authError;
   const setError = setLocalError;
@@ -91,6 +105,47 @@ export default function AuthModal() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Ошибка при входе через Google');
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (authMode === 'register') {
+        if (password !== confirmPassword) {
+          setError('Пароли не совпадают');
+          setLoading(false);
+          return;
+        }
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        setNeedsNickname(true);
+        setCurrentUser(result.user);
+      } else {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+        if (!userDoc.exists()) {
+          setNeedsNickname(true);
+          setCurrentUser(result.user);
+        } else {
+          // Explicitly set profile in store to ensure UI updates
+          useAppStore.getState().setUserProfile(userDoc.data() as UserProfile);
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      let msg = 'Ошибка авторизации';
+      if (err.code === 'auth/email-already-in-use') msg = 'Этот email уже используется';
+      if (err.code === 'auth/invalid-email') msg = 'Некорректный email';
+      if (err.code === 'auth/weak-password') msg = 'Слишком слабый пароль';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = 'Неверный email или пароль';
+      if (err.code === 'auth/operation-not-allowed') msg = 'Вход по Email и Паролю не включен в консоли Firebase. Пожалуйста, включите его в разделе Authentication -> Sign-in method.';
+      if (err.code === 'auth/too-many-requests') msg = 'Слишком много попыток. Попробуйте позже.';
+      setError(`${msg} (${err.code || 'unknown'})`);
+    } finally {
       setLoading(false);
     }
   };
@@ -183,6 +238,7 @@ export default function AuthModal() {
 
   const handleLogout = async () => {
     await signOut(auth);
+    useAppStore.getState().setActivePromoCode(null);
     setNeedsNickname(false);
   };
 
@@ -191,36 +247,163 @@ export default function AuthModal() {
       <Card className="w-full max-w-md border-none shadow-2xl animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="space-y-3 pb-4">
           <div className="w-12 h-12 bg-blue-900/30 rounded-full flex items-center justify-center mb-2 mx-auto">
-            <User className="text-blue-400" size={24} />
+            {authMode === 'register' ? <UserPlus className="text-blue-400" size={24} /> : <User className="text-blue-400" size={24} />}
           </div>
           <CardTitle className="text-2xl text-center font-display">
-            {needsNickname ? 'Завершение регистрации' : 'Авторизация'}
+            {needsNickname ? 'Завершение регистрации' : 
+             authMode === 'register' ? 'Регистрация' : 
+             authMode === 'login' ? 'Вход в аккаунт' : 'Авторизация'}
           </CardTitle>
           <CardDescription className="text-center text-base">
             {needsNickname 
               ? 'Выберите уникальный никнейм для вашего профиля' 
-              : 'Пожалуйста, войдите для использования сервиса подбора'}
+              : authMode === 'register' ? 'Создайте аккаунт для доступа к сервису' : 'Пожалуйста, войдите для использования сервиса подбора'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!needsNickname ? (
             <div className="space-y-4">
-              <Button 
-                onClick={handleGoogleLogin} 
-                disabled={loading}
-                className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
-                size="lg"
-              >
-                {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-                Войти через Google
-              </Button>
+              {authMode === 'social' ? (
+                <div className="grid grid-cols-1 gap-3">
+                  <Button 
+                    onClick={handleGoogleLogin} 
+                    disabled={loading}
+                    className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                    Войти через Google
+                  </Button>
+
+                  <div className="relative my-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-zinc-800" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-zinc-950 px-2 text-zinc-500">или</span>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={() => setAuthMode('login')} 
+                    disabled={loading}
+                    variant="outline"
+                    className="w-full border-zinc-800 text-zinc-300 hover:bg-zinc-900 flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    <Mail size={20} />
+                    Войти через Email
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setAuthMode('register')} 
+                    disabled={loading}
+                    variant="ghost"
+                    className="w-full text-zinc-400 hover:text-white text-sm"
+                  >
+                    Нет аккаунта? Зарегистрироваться
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleEmailAuth} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 text-zinc-500" size={18} />
+                      <Input 
+                        type="email"
+                        placeholder="example@mail.com" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="pl-10"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Пароль</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 text-zinc-500" size={18} />
+                      <Input 
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-zinc-500 hover:text-zinc-300 transition-colors"
+                        disabled={loading}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {authMode === 'register' && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Повторите пароль</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 text-zinc-500" size={18} />
+                        <Input 
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="••••••••" 
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="pl-10 pr-10"
+                          required
+                          disabled={loading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-3 text-zinc-500 hover:text-zinc-300 transition-colors"
+                          disabled={loading}
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button 
+                      type="submit" 
+                      disabled={loading}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white" 
+                      size="lg"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={20} /> : 
+                       authMode === 'register' ? 'Создать аккаунт' : 'Войти'}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      onClick={() => setAuthMode('social')}
+                      disabled={loading}
+                      className="w-full text-zinc-400 hover:text-white"
+                    >
+                      Назад
+                    </Button>
+                  </div>
+                </form>
+              )}
+
               {error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
                   <p className="text-xs text-red-500 text-center">{error}</p>
                 </div>
               )}
               <p className="text-xs text-zinc-500 text-center leading-relaxed">
-                Используйте ваш Google аккаунт для быстрого и безопасного входа.
+                {authMode === 'social' 
+                  ? 'Используйте ваш Google аккаунт для быстрого и безопасного входа.'
+                  : 'Ваши данные надежно защищены шифрованием.'}
               </p>
               
               {auth.currentUser?.email?.toLowerCase() === 'minerpc2002@gmail.com' && !userProfile && (

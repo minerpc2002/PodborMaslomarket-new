@@ -37,6 +37,30 @@
         "timestamp": { "type": "integer", "description": "Log timestamp (ms)" }
       },
       "required": ["userId", "action", "timestamp"]
+    },
+    "AppSetting": {
+      "title": "AppSetting",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "isAiSearchEnabled": { "type": "boolean", "description": "Toggle for AI search" },
+        "updatedAt": { "type": "integer", "description": "Last update timestamp" },
+        "updatedBy": { "type": "string", "description": "Admin UID who last updated" }
+      },
+      "required": ["isAiSearchEnabled", "updatedAt", "updatedBy"]
+    },
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Messages for support chat",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user who started the chat" },
+        "senderId": { "type": "string", "description": "UID of the sender (user or admin)" },
+        "text": { "type": "string", "description": "Message content" },
+        "isAdmin": { "type": "boolean", "description": "Whether the sender is an admin" },
+        "timestamp": { "type": "integer", "description": "Message timestamp (ms)" }
+      },
+      "required": ["userId", "senderId", "text", "isAdmin", "timestamp"]
     }
   },
   "firestore": {
@@ -51,6 +75,14 @@
     "/user_logs/{logId}": {
       "schema": "UserLog",
       "description": "System logs"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppSetting",
+      "description": "Global application settings"
+    },
+    "/support_messages/{messageId}": {
+      "schema": "SupportMessage",
+      "description": "Support chat messages"
     }
   }
 }

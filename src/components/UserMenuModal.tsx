@@ -7,6 +7,8 @@ import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { cn } from '../lib/utils';
+
 interface UserMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,10 +16,12 @@ interface UserMenuModalProps {
 }
 
 export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenuModalProps) {
-  const { userProfile } = useAppStore();
+  const { userProfile, activePromoCode } = useAppStore();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
   if (!isOpen) return null;
+
+  const isPromoActive = activePromoCode && activePromoCode.expiresAt > Date.now();
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -44,12 +48,14 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
           <CardHeader className="pb-4 pt-8 text-center">
             <div className="relative mx-auto w-20 h-20 mb-4">
               <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 animate-pulse" />
-              <img 
-                src={auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.nickname}`} 
-                alt="Profile" 
-                className="relative w-20 h-20 rounded-full border-2 border-blue-500/50 object-cover shadow-lg"
-                referrerPolicy="no-referrer"
-              />
+              <div className={cn("relative w-20 h-20 mx-auto", isPromoActive && "pro-avatar-border")}>
+                <img 
+                  src={auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.nickname}`} 
+                  alt="Profile" 
+                  className="relative w-full h-full rounded-full border-2 border-blue-500/50 object-cover shadow-lg"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
             <CardTitle className="text-xl font-display">{userProfile?.nickname}</CardTitle>
             <CardDescription className="text-zinc-400 text-xs truncate max-w-[200px] mx-auto">

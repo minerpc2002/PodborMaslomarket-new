@@ -9,9 +9,11 @@ import PromoModal from './PromoModal';
 import { auth } from '../firebase';
 import FAQModal from './FAQModal';
 import HowItWorksModal from './HowItWorksModal';
+import SupportChatModal from './SupportChatModal';
 import { useAppStore } from '../store/useAppStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { signOut } from 'firebase/auth';
+import { MessageSquare } from 'lucide-react';
 
 export default function Layout() {
   const location = useLocation();
@@ -21,6 +23,7 @@ export default function Layout() {
   const [isFAQModalOpen, setIsFAQModalOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   useEffect(() => {
     setupTelegram();
@@ -54,6 +57,7 @@ export default function Layout() {
       <PromoModal isOpen={isPromoModalOpen} onClose={() => setIsPromoModalOpen(false)} />
       <FAQModal isOpen={isFAQModalOpen} onClose={() => setIsFAQModalOpen(false)} />
       <HowItWorksModal isOpen={isHowItWorksOpen} onClose={() => setIsHowItWorksOpen(false)} />
+      <SupportChatModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
       
       <motion.header 
         initial={{ y: -20, opacity: 0 }}
@@ -97,6 +101,16 @@ export default function Layout() {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              onClick={() => setIsSupportModalOpen(true)}
+              className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+              title="Поддержка"
+            >
+              <MessageSquare size={20} />
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setIsFAQModalOpen(true)}
               className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
               title="Часто задаваемые вопросы"
@@ -121,7 +135,7 @@ export default function Layout() {
                 onClick={() => setIsUserMenuOpen(true)}
                 className="flex items-center gap-2.5 p-1.5 pr-3 bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 rounded-full transition-all group ml-1"
               >
-                <div className="relative shrink-0">
+                <div className={cn("relative shrink-0", isPromoActive && "pro-avatar-border")}>
                   <img 
                     src={auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.nickname}`} 
                     alt="Profile" 
@@ -135,7 +149,7 @@ export default function Layout() {
                     {userProfile.nickname}
                   </span>
                   <span className="text-[9px] text-zinc-500 uppercase tracking-tighter mt-0.5">
-                    {userProfile.role === 'admin' ? 'Admin' : 'Pro'}
+                    {userProfile.role === 'admin' ? 'Admin' : isPromoActive ? 'Pro' : 'User'}
                   </span>
                 </div>
               </motion.button>

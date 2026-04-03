@@ -14,6 +14,7 @@ interface AppState {
   activePromoCode: PromoCode | null;
   searchTimestamps: number[];
   authError: string | null;
+  isAiSearchEnabled: boolean;
   
   addFavorite: (car: CarData) => void;
   removeFavorite: (carId: string) => void;
@@ -25,6 +26,7 @@ interface AppState {
   setAuthReady: (ready: boolean) => void;
   setActivePromoCode: (promo: PromoCode | null) => void;
   setAuthError: (error: string | null) => void;
+  setIsAiSearchEnabled: (enabled: boolean) => void;
   
   recordSearch: () => void;
   getSearchStatus: () => { remainingAttempts: number; totalAttempts: number; minutesUntilReset: number };
@@ -42,6 +44,7 @@ export const useAppStore = create<AppState>()(
       activePromoCode: null,
       searchTimestamps: [],
       authError: null,
+      isAiSearchEnabled: true,
       
       addFavorite: (car) => set((state) => ({ 
         favorites: state.favorites.some(f => f.id === car.id) 
@@ -65,6 +68,7 @@ export const useAppStore = create<AppState>()(
       setAuthReady: (ready) => set({ isAuthReady: ready }),
       setActivePromoCode: (promo) => set({ activePromoCode: promo }),
       setAuthError: (error) => set({ authError: error }),
+      setIsAiSearchEnabled: (enabled) => set({ isAiSearchEnabled: enabled }),
       
       recordSearch: () => set((state) => {
         const now = Date.now();

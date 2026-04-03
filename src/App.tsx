@@ -19,10 +19,17 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from './types';
 
 export default function App() {
-  const { setUserProfile, setAuthReady, userProfile, setAuthError } = useAppStore();
+  const { setUserProfile, setAuthReady, userProfile, setAuthError, setIsAiSearchEnabled } = useAppStore();
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
+
+    // Listen to AI settings
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'ai_config'), (docSnap) => {
+      if (docSnap.exists()) {
+        setIsAiSearchEnabled(docSnap.data().isAiSearchEnabled ?? true);
+      }
+    });
 
     let unsubscribeDoc: (() => void) | undefined;
 
@@ -38,22 +45,27 @@ export default function App() {
           if (userDoc.exists()) {
             const profile = userDoc.data() as UserProfile;
             setUserProfile(profile);
-            // Sync active promo code from profile if it exists
+            // Sync active promo code from profile if it exists, otherwise clear it
             if (profile.activePromoCode !== undefined) {
               useAppStore.getState().setActivePromoCode(profile.activePromoCode);
+            } else {
+              useAppStore.getState().setActivePromoCode(null);
             }
           } else {
             setUserProfile(null);
+            useAppStore.getState().setActivePromoCode(null);
           }
           setAuthReady(true);
         }, (error) => {
           console.error("Error fetching user profile:", error);
           setAuthError(`Ошибка профиля: ${error.message}`);
           setUserProfile(null);
+          useAppStore.getState().setActivePromoCode(null);
           setAuthReady(true);
         });
       } else {
         setUserProfile(null);
+        useAppStore.getState().setActivePromoCode(null);
         setAuthReady(true);
         setAuthError(null);
       }
@@ -62,8 +74,9 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
+      unsubSettings();
     };
-  }, [setUserProfile, setAuthReady, setAuthError]);
+  }, [setUserProfile, setAuthReady, setAuthError, setIsAiSearchEnabled]);
 
   const isStaff = userProfile?.role === 'admin' || 
                   userProfile?.role === 'moderator' || 

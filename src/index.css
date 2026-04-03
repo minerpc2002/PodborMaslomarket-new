@@ -128,3 +128,18 @@ html, body {
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
 }
+
+.pro-avatar-border {
+  position: relative;
+  padding: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6);
+  background-size: 300% 300%;
+  animation: pro-gradient 4s ease infinite;
+  border-radius: 50%;
+}
+
+@keyframes pro-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
