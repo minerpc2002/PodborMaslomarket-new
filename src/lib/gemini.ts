@@ -579,6 +579,7 @@ ${ravenolData.substring(0, 50000)}
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 4. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.
+   - STRICT COMPLIANCE: You MUST NOT substitute Ravenol products based on your internal knowledge. If the <technical_data> specifies a product (e.g., "LTC - Protect C12++ Premix -40°C") for a specific unit (e.g., "Система активной регулировки кузова"), you MUST recommend EXACTLY that product for that unit. Do not assume it's a mistake.
    - NO DUPLICATES: You MUST NOT duplicate the same oil/product in the "products" array. Every product in the list MUST be a different, unique product.
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
@@ -696,6 +697,7 @@ ${ravenolData.substring(0, 50000)}
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 3. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.
+   - STRICT COMPLIANCE: You MUST NOT substitute Ravenol products based on your internal knowledge. If the <technical_data> specifies a product (e.g., "LTC - Protect C12++ Premix -40°C") for a specific unit (e.g., "Система активной регулировки кузова"), you MUST recommend EXACTLY that product for that unit. Do not assume it's a mistake.
    - NO DUPLICATES: You MUST NOT duplicate the same oil/product in the "products" array. Every product in the list MUST be a different, unique product.
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
