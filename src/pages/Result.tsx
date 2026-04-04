@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Share2, Heart, Copy, Info, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Heart, Copy, Info, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { mockCars } from '../data/mockData';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/button';
@@ -80,9 +80,6 @@ export default function Result() {
           <ArrowLeft size={24} />
         </Button>
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={handleShare}>
-            <Share2 size={20} />
-          </Button>
           <Button variant="ghost" size="icon" onClick={toggleFavorite} className={isFavorite ? "text-red-500" : ""}>
             <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
           </Button>
