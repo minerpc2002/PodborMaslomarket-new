@@ -9,7 +9,7 @@ import { doc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 async function trackAiUsage(model: string) {
   try {
     const usageDoc = doc(db, 'settings', 'ai_usage');
-    const fieldName = model.replace(/\./g, '_').replace(/-/g, '_');
+    const fieldName = model.replace(/\./g, '_').replace(/-/g, '_').replace(/\//g, '_').replace(/:/g, '_');
     await setDoc(usageDoc, {
       [`${fieldName}_usage`]: increment(1),
       last_updated: serverTimestamp()

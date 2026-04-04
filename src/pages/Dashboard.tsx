@@ -123,9 +123,31 @@ export default function Dashboard() {
       setAiLoad(Math.floor(Math.random() * 40) + 10); // Random load between 10-50%
 
       // Listen to AI Usage
-      const usageUnsubscribe = onSnapshot(doc(db, 'settings', 'ai_usage'), (doc) => {
-        if (doc.exists()) {
-          setAiUsage(doc.data());
+      const usageUnsubscribe = onSnapshot(doc(db, 'settings', 'ai_usage'), (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setAiUsage(data);
+          
+          // Calculate overall load
+          const quotas = [
+            { key: 'gemini_3_1_pro_preview_usage', limit: 50 },
+            { key: 'gemini_3_1_flash_preview_usage', limit: 1500 },
+            { key: 'gemini_3_1_flash_lite_preview_usage', limit: 1500 },
+            { key: 'gemini_3_flash_preview_usage', limit: 1500 },
+            { key: 'gemini_2_5_flash_usage', limit: 1500 },
+            { key: 'openrouter_qwen_qwen3_6_plus_free_usage', limit: 1000 }
+          ];
+          
+          let totalUsage = 0;
+          let totalLimit = 0;
+          
+          quotas.forEach(q => {
+            totalUsage += data[q.key] || 0;
+            totalLimit += q.limit;
+          });
+          
+          const overallLoad = Math.min(100, Math.round((totalUsage / totalLimit) * 100));
+          setAiLoad(overallLoad);
         }
       });
 
@@ -457,6 +479,11 @@ export default function Dashboard() {
   const handleUpdateUser = (updatedUser: UserProfile) => {
     setUsers(users.map(u => u.uid === updatedUser.uid ? updatedUser : u));
     setSelectedUser(updatedUser);
+  };
+
+  const handleDeleteUserFromList = (uid: string) => {
+    setUsers(users.filter(u => u.uid !== uid));
+    setSelectedUser(null);
   };
 
   const filteredUsers = users.filter(user => {
@@ -1178,40 +1205,43 @@ export default function Dashboard() {
                       </div>
                       <div className="divide-y divide-white/5">
                         {[...aiModelsConfig].sort((a, b) => a.priority - b.priority).map((model, index) => (
-                          <div key={model.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <div className="flex flex-col gap-1">
+                          <div key={model.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-white/5 transition-colors gap-3">
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="flex flex-row sm:flex-col gap-2 sm:gap-1">
                                 <button 
                                   onClick={() => handleMoveAiModel(model.id, 'up')}
                                   disabled={index === 0 || actionLoading !== null}
-                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
                                 >
-                                  <ChevronUp size={16} />
+                                  <ChevronUp size={16} className="sm:size-[16px] size-[20px]" />
                                 </button>
                                 <button 
                                   onClick={() => handleMoveAiModel(model.id, 'down')}
                                   disabled={index === aiModelsConfig.length - 1 || actionLoading !== null}
-                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
                                 >
-                                  <ChevronDown size={16} />
+                                  <ChevronDown size={16} className="sm:size-[16px] size-[20px]" />
                                 </button>
                               </div>
-                              <div>
-                                <h4 className="font-bold text-zinc-200 flex items-center gap-2">
-                                  {model.name}
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-zinc-200 flex items-center gap-2 text-sm sm:text-base">
+                                  <span className="truncate">{model.name}</span>
                                   {index === 0 && model.enabled && (
-                                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                    <span className="text-[9px] sm:text-[10px] bg-blue-500/20 text-blue-400 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-500/30 shrink-0">
                                       Основная
                                     </span>
                                   )}
                                 </h4>
-                                <p className="text-xs text-zinc-500 font-mono mt-1">{model.id}</p>
+                                <p className="text-[10px] sm:text-xs text-zinc-500 font-mono mt-0.5 truncate">{model.id}</p>
                               </div>
                             </div>
                             <Button
                               variant={model.enabled ? 'default' : 'outline'}
                               size="sm"
-                              className={model.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'}
+                              className={cn(
+                                "w-full sm:w-auto h-9 sm:h-8 text-xs font-bold",
+                                model.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
+                              )}
                               onClick={() => handleToggleAiModel(model.id)}
                               disabled={actionLoading === `toggle-model-${model.id}`}
                             >
@@ -1288,6 +1318,13 @@ export default function Dashboard() {
                           limit: 1500, 
                           color: 'amber',
                           desc: 'Резервная модель'
+                        },
+                        { 
+                          name: 'OpenRouter Qwen', 
+                          key: 'openrouter_qwen_qwen3_6_plus_free_usage', 
+                          limit: 1000, 
+                          color: 'rose',
+                          desc: 'Внешняя модель (Qwen)'
                         }
                       ].map((model) => {
                         const usage = aiUsage[model.key] || 0;
@@ -1339,6 +1376,7 @@ export default function Dashboard() {
           isOpen={!!selectedUser}
           onClose={() => setSelectedUser(null)}
           onUpdateUser={handleUpdateUser}
+          onDeleteUser={handleDeleteUserFromList}
           isAdmin={isAdmin}
         />
       )}

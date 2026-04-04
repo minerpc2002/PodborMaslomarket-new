@@ -15,10 +15,11 @@ interface UserAdminModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdateUser: (updatedUser: UserProfile) => void;
+  onDeleteUser: (uid: string) => void;
   isAdmin: boolean;
 }
 
-export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, isAdmin }: UserAdminModalProps) {
+export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, onDeleteUser, isAdmin }: UserAdminModalProps) {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<UserLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -128,9 +129,9 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, is
         console.log('Nickname document deleted');
       }
       
-      // 3. Optional: Delete logs and messages? 
-      // For now, just reload to refresh the list
-      window.location.reload();
+      // 3. Close modal and update parent
+      onClose();
+      onDeleteUser(user.uid);
     } catch (err: any) {
       console.error('Error deleting user:', err);
       setDeleteError(err.message || 'Ошибка при удалении пользователя');
