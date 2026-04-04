@@ -56,7 +56,7 @@ const productSchema = {
 const recommendationSchema = {
   type: Type.OBJECT,
   properties: {
-    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. ОБЯЗАТЕЛЬНО включи: 'Масло в двигатель', 'Коробка передач', 'Раздаточная коробка', 'Дифференциал, передний', 'Дифференциал, задний', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'" },
+    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. ОБЯЗАТЕЛЬНО включи: 'Масло в двигатель', 'Коробка передач', 'Раздаточная коробка', 'Дифференциал, передний', 'Дифференциал, задний', 'ГУР', 'Тормозная система', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'" },
     fluid_type: { type: Type.STRING },
     factory_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная заводом-изготовителем" },
     recommended_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная с учетом пробега и условий эксплуатации" },
@@ -557,14 +557,14 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", list ALL viscosities (e.g., "0W-20, 5W-30"). Include ALL technical information and notes.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
+   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Тормозная система', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
    - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
    - BARDAHL FOR ALL UNITS: You MUST provide Bardahl analogs for ALL units (Engine, Transmission, Differentials, etc.), not just for the engine. Bardahl has a full range of products for all automotive systems.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
 4. NO Liqui Moly.
 5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array.`;
   } else {
@@ -584,14 +584,14 @@ ${ravenolData.substring(0, 50000)}
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: ONLY include units that are explicitly present in the <technical_data>. DO NOT invent or add units (like Power Steering, Active Body Control, etc.) if they are missing from the source data.
+   - CRITICAL: ONLY include units that are explicitly present in the <technical_data>. DO NOT invent or add units (like Power Steering, Active Body Control, etc.) if they are missing from the source data. Shorten 'Гидравлическая тормозная система, АБС' to 'Тормозная система'.
    - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ (из тех, что есть в каталоге).
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
    - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
 5. NO Liqui Moly.
 6. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array. Ensure "factory_viscosity", "volume_liters", and all technical info are exactly as in the catalog.`;
   }
@@ -674,14 +674,14 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
        - NO DUPLICATES: You MUST NOT duplicate the same oil/product in the "products" array. Every product in the list MUST be a different, unique product.
        - FACTORY VISCOSITY & INFO: For "factory_viscosity", list ALL viscosities (e.g., "0W-20, 5W-30"). Include ALL technical information and notes.
        - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
-       - CRITICAL: ONLY include units that are explicitly relevant to this vehicle. DO NOT invent or add units if they are not applicable.
+       - CRITICAL: ONLY include units that are explicitly relevant to this vehicle. DO NOT invent or add units if they are not applicable. Shorten 'Гидравлическая тормозная система, АБС' to 'Тормозная система'.
        - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
        - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
        - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
        - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
        - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
        - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-       - ANTIFREEZE: For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+       - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
     4. NO Liqui Moly.
     5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array.
     6. IMPORTANT: Add a note in the description of the first unit that this data is provided by AI because the official catalog was unreachable.`;
@@ -702,13 +702,13 @@ ${ravenolData.substring(0, 50000)}
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: ONLY include units that are explicitly present in the <technical_data>. DO NOT invent or add units (like Power Steering, Active Body Control, etc.) if they are missing from the source data.
+   - CRITICAL: ONLY include units that are explicitly present in the <technical_data>. DO NOT invent or add units (like Power Steering, Active Body Control, etc.) if they are missing from the source data. Shorten 'Гидравлическая тормозная система, АБС' to 'Тормозная система'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ (из тех, что есть в каталоге).
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
    - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
 4. NO Liqui Moly.
 5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array. Ensure "factory_viscosity", "volume_liters", and all technical info are exactly as in the catalog.`;
   }
