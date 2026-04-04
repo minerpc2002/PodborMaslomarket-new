@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, MessageSquare, Loader2 } from 'lucide-react';
+import { X, Send, MessageSquare, Loader2, ShieldAlert, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -36,6 +36,11 @@ export default function SupportChatModal({ isOpen, onClose }: SupportChatModalPr
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const isBanned = userProfile?.supportBan && userProfile.supportBan.expiresAt > Date.now();
+  const banTimeLeft = isBanned ? Math.ceil((userProfile!.supportBan!.expiresAt - Date.now()) / (60 * 1000)) : 0;
+  const banHours = Math.floor(banTimeLeft / 60);
+  const banMinutes = banTimeLeft % 60;
 
   useEffect(() => {
     if (!isOpen || !userProfile) return;
@@ -105,7 +110,7 @@ export default function SupportChatModal({ isOpen, onClose }: SupportChatModalPr
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !userProfile) return;
+    if (!newMessage.trim() || !userProfile || isBanned) return;
 
     setLoading(true);
     try {
@@ -171,7 +176,26 @@ export default function SupportChatModal({ isOpen, onClose }: SupportChatModalPr
           </CardHeader>
 
           <CardContent className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar overscroll-contain">
-            {messages.length === 0 ? (
+            {isBanned ? (
+              <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 py-10 px-6">
+                <div className="p-4 bg-red-500/10 rounded-full border border-red-500/20 text-red-400">
+                  <ShieldAlert size={48} />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-bold text-zinc-100">Доступ ограничен</h3>
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    Вы временно заблокированы в чате поддержки.<br/>
+                    <span className="text-red-400/80">Причина: {userProfile?.supportBan?.reason}</span>
+                  </p>
+                  <div className="flex items-center justify-center gap-2 text-amber-400 bg-amber-500/10 px-4 py-2 rounded-xl border border-amber-500/20 mt-4">
+                    <Clock size={16} />
+                    <span className="text-sm font-bold">
+                      Осталось: {banHours > 0 ? `${banHours}ч ` : ''}{banMinutes}м
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-2 py-10">
                 <MessageSquare size={48} className="opacity-20" />
                 <p className="text-sm text-center">Нет сообщений.<br/>Напишите нам, если у вас возникли проблемы.</p>
@@ -207,13 +231,13 @@ export default function SupportChatModal({ isOpen, onClose }: SupportChatModalPr
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Сообщение..."
+                placeholder={isBanned ? "Чат заблокирован" : "Сообщение..."}
                 className="flex-1 bg-zinc-900/50 border-white/10 focus-visible:ring-blue-500 rounded-xl h-11"
-                disabled={loading}
+                disabled={loading || isBanned}
               />
               <Button 
                 type="submit" 
-                disabled={!newMessage.trim() || loading}
+                disabled={!newMessage.trim() || loading || isBanned}
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 h-11 w-11 sm:w-auto shrink-0"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}

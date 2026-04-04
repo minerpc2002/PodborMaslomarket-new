@@ -40,7 +40,13 @@ export interface CarData {
   recommendations: Recommendation[];
 }
 
-export type UserRole = 'admin' | 'moderator' | 'user';
+export type UserRole = 'admin' | 'moderator' | 'pro' | 'user';
+
+export interface SupportBan {
+  expiresAt: number;
+  reason: string;
+  bannedAt: number;
+}
 
 export interface UserProfile {
   uid: string;
@@ -49,6 +55,7 @@ export interface UserProfile {
   role: UserRole;
   createdAt: number;
   activePromoCode?: PromoCode | null;
+  supportBan?: SupportBan | null;
 }
 
 export interface PromoCode {
@@ -57,4 +64,11 @@ export interface PromoCode {
   maxAttempts: number;
   createdBy: string;
   createdAt: number;
+}
+
+export interface AiModelConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
 }

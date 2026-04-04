@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CarData, UserProfile, PromoCode } from '../types';
+import { CarData, UserProfile, PromoCode, AiModelConfig } from '../types';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -15,6 +15,8 @@ interface AppState {
   searchTimestamps: number[];
   authError: string | null;
   isAiSearchEnabled: boolean;
+  aiModelsConfig: AiModelConfig[];
+  isSnowfallEnabled: boolean;
   
   addFavorite: (car: CarData) => void;
   removeFavorite: (carId: string) => void;
@@ -27,6 +29,8 @@ interface AppState {
   setActivePromoCode: (promo: PromoCode | null) => void;
   setAuthError: (error: string | null) => void;
   setIsAiSearchEnabled: (enabled: boolean) => void;
+  setAiModelsConfig: (config: AiModelConfig[]) => void;
+  setIsSnowfallEnabled: (enabled: boolean) => void;
   
   recordSearch: () => void;
   getSearchStatus: () => { remainingAttempts: number; totalAttempts: number; minutesUntilReset: number };
@@ -45,6 +49,14 @@ export const useAppStore = create<AppState>()(
       searchTimestamps: [],
       authError: null,
       isAiSearchEnabled: true,
+      aiModelsConfig: [
+        { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', enabled: true, priority: 1 },
+        { id: 'gemini-3.1-flash-preview', name: 'Gemini 3.1 Flash', enabled: true, priority: 2 },
+        { id: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash', enabled: true, priority: 3 },
+        { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', enabled: true, priority: 4 },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 5 }
+      ],
+      isSnowfallEnabled: false,
       
       addFavorite: (car) => set((state) => ({ 
         favorites: state.favorites.some(f => f.id === car.id) 
@@ -69,6 +81,8 @@ export const useAppStore = create<AppState>()(
       setActivePromoCode: (promo) => set({ activePromoCode: promo }),
       setAuthError: (error) => set({ authError: error }),
       setIsAiSearchEnabled: (enabled) => set({ isAiSearchEnabled: enabled }),
+      setAiModelsConfig: (config) => set({ aiModelsConfig: config }),
+      setIsSnowfallEnabled: (enabled) => set({ isSnowfallEnabled: enabled }),
       
       recordSearch: () => set((state) => {
         const now = Date.now();
@@ -121,7 +135,9 @@ export const useAppStore = create<AppState>()(
         history: state.history,
         dynamicCars: state.dynamicCars,
         searchTimestamps: state.searchTimestamps,
-        activePromoCode: state.activePromoCode
+        activePromoCode: state.activePromoCode,
+        aiModelsConfig: state.aiModelsConfig,
+        isSnowfallEnabled: state.isSnowfallEnabled
       }),
     }
   )

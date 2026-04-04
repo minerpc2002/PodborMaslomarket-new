@@ -12,6 +12,7 @@ import Result from './pages/Result';
 import Favorites from './pages/Favorites';
 import History from './pages/History';
 import Dashboard from './pages/Dashboard';
+import Snowfall from './components/Snowfall';
 import { useAppStore } from './store/useAppStore';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -19,7 +20,7 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from './types';
 
 export default function App() {
-  const { setUserProfile, setAuthReady, userProfile, setAuthError, setIsAiSearchEnabled } = useAppStore();
+  const { setUserProfile, setAuthReady, userProfile, setAuthError, setIsAiSearchEnabled, isSnowfallEnabled, setIsSnowfallEnabled } = useAppStore();
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -27,7 +28,9 @@ export default function App() {
     // Listen to AI settings
     const unsubSettings = onSnapshot(doc(db, 'settings', 'ai_config'), (docSnap) => {
       if (docSnap.exists()) {
-        setIsAiSearchEnabled(docSnap.data().isAiSearchEnabled ?? true);
+        const data = docSnap.data();
+        setIsAiSearchEnabled(data.isAiSearchEnabled ?? true);
+        setIsSnowfallEnabled(data.isSnowfallEnabled ?? false);
       }
     });
 
@@ -85,6 +88,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {isSnowfallEnabled && <Snowfall />}
       <div className="bg-blobs">
         <div className="blob w-[800px] h-[800px] bg-blue-600/50 -top-[10%] -left-[10%]" />
         <div className="blob w-[900px] h-[900px] bg-indigo-500/40 -bottom-[10%] -right-[10%] animation-delay-2000" />

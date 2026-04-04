@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from '../store/useAppStore';
 import { collection, getDocs, doc, updateDoc, setDoc, query, orderBy, deleteDoc, getDoc, onSnapshot, addDoc, where } from 'firebase/firestore';
 import { UserProfile, PromoCode, UserRole } from '../types';
@@ -6,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -29,11 +30,17 @@ interface SupportChat {
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
-  const { userProfile } = useAppStore();
+  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled } = useAppStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Support Ban State
+  const [banUserId, setBanUserId] = useState<string | null>(null);
+  const [banHours, setBanHours] = useState('1');
+  const [banMinutes, setBanMinutes] = useState('0');
+  const [banReason, setBanReason] = useState('Нарушение правил общения');
 
   // User list state
   const [userFilter, setUserFilter] = useState<'all' | 'admin' | 'moderator' | 'pro' | 'user'>('all');
@@ -56,6 +63,7 @@ export default function Dashboard() {
   const [supportChats, setSupportChats] = useState<Record<string, SupportChat>>({});
   const [activeChatUserId, setActiveChatUserId] = useState<string | null>(null);
   const [adminReply, setAdminReply] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userProfile?.role === 'admin' || userProfile?.email?.toLowerCase() === 'minerpc2002@gmail.com';
@@ -93,11 +101,19 @@ export default function Dashboard() {
       // Fetch AI Settings
       const settingsDoc = await getDoc(doc(db, 'settings', 'ai_config'));
       if (settingsDoc.exists()) {
-        setIsAiSearchEnabled(settingsDoc.data().isAiSearchEnabled ?? true);
+        const data = settingsDoc.data();
+        setIsAiSearchEnabled(data.isAiSearchEnabled ?? true);
+        setIsSnowfallEnabled(data.isSnowfallEnabled ?? false);
+        if (data.aiModelsConfig) {
+          setAiModelsConfig(data.aiModelsConfig);
+        }
       } else {
         // Create default settings if not exists
+        const defaultConfig = useAppStore.getState().aiModelsConfig;
         await setDoc(doc(db, 'settings', 'ai_config'), {
           isAiSearchEnabled: true,
+          isSnowfallEnabled: false,
+          aiModelsConfig: defaultConfig,
           updatedAt: Date.now(),
           updatedBy: userProfile?.uid || 'system'
         });
@@ -183,6 +199,99 @@ export default function Dashboard() {
     };
   }, [isStaff]);
 
+  const handleToggleSnowfall = async () => {
+    if (!isAdmin) return;
+    setActionLoading('toggle-snow');
+    try {
+      const newValue = !isSnowfallEnabled;
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        isSnowfallEnabled: newValue,
+        updatedAt: Date.now(),
+        updatedBy: userProfile?.uid
+      }, { merge: true });
+      setIsSnowfallEnabled(newValue);
+    } catch (err) {
+      console.error('Error toggling snowfall:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteChat = async (userId: string) => {
+    if (!isAdmin) return;
+    
+    setActionLoading('delete-chat');
+    try {
+      console.log('Deleting chat for user:', userId);
+      // Delete messages
+      const msgsQuery = query(collection(db, 'support_messages'), where('userId', '==', userId));
+      const msgsSnap = await getDocs(msgsQuery);
+      console.log(`Found ${msgsSnap.size} messages to delete`);
+      
+      const deleteMsgsPromises = msgsSnap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deleteMsgsPromises);
+      
+      // Delete chat status
+      await deleteDoc(doc(db, 'support_chats', userId));
+      console.log('Chat status deleted');
+      
+      if (activeChatUserId === userId) {
+        setActiveChatUserId(null);
+      }
+      setShowDeleteConfirm(null);
+    } catch (err) {
+      console.error('Error deleting chat:', err);
+      alert('Ошибка при удалении чата. Проверьте консоль.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBanUser = async () => {
+    if (!isAdmin || !banUserId) return;
+    
+    setActionLoading('ban-user');
+    try {
+      const durationMs = (parseInt(banHours) * 60 + parseInt(banMinutes)) * 60 * 1000;
+      const expiresAt = Date.now() + durationMs;
+      
+      await updateDoc(doc(db, 'users', banUserId), {
+        supportBan: {
+          expiresAt,
+          reason: banReason,
+          bannedAt: Date.now()
+        }
+      });
+      
+      // Update local state
+      setUsers(users.map(u => u.uid === banUserId ? { 
+        ...u, 
+        supportBan: { expiresAt, reason: banReason, bannedAt: Date.now() } 
+      } : u));
+      
+      setBanUserId(null);
+    } catch (err) {
+      console.error('Error banning user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnbanUser = async (uid: string) => {
+    if (!isAdmin) return;
+    setActionLoading(`unban-${uid}`);
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        supportBan: null
+      });
+      setUsers(users.map(u => u.uid === uid ? { ...u, supportBan: null } : u));
+    } catch (err) {
+      console.error('Error unbanning user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleToggleAiSearch = async () => {
     if (!isAdmin) return;
     setActionLoading('toggle-ai');
@@ -196,6 +305,63 @@ export default function Dashboard() {
       setIsAiSearchEnabled(newValue);
     } catch (err) {
       console.error('Error toggling AI search:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleAiModel = async (modelId: string) => {
+    if (!isAdmin) return;
+    setActionLoading(`toggle-model-${modelId}`);
+    try {
+      const updatedModels = aiModelsConfig.map(m => 
+        m.id === modelId ? { ...m, enabled: !m.enabled } : m
+      );
+      
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        aiModelsConfig: updatedModels,
+        updatedAt: Date.now(),
+        updatedBy: userProfile?.uid
+      }, { merge: true });
+      
+      setAiModelsConfig(updatedModels);
+    } catch (err) {
+      console.error('Error toggling AI model:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMoveAiModel = async (modelId: string, direction: 'up' | 'down') => {
+    if (!isAdmin) return;
+    setActionLoading(`move-model-${modelId}`);
+    try {
+      const index = aiModelsConfig.findIndex(m => m.id === modelId);
+      if (index < 0) return;
+      if (direction === 'up' && index === 0) return;
+      if (direction === 'down' && index === aiModelsConfig.length - 1) return;
+
+      const newModels = [...aiModelsConfig].sort((a, b) => a.priority - b.priority);
+      const currentIndex = newModels.findIndex(m => m.id === modelId);
+      const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      // Swap priorities
+      const tempPriority = newModels[currentIndex].priority;
+      newModels[currentIndex].priority = newModels[swapIndex].priority;
+      newModels[swapIndex].priority = tempPriority;
+
+      // Re-sort
+      newModels.sort((a, b) => a.priority - b.priority);
+
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        aiModelsConfig: newModels,
+        updatedAt: Date.now(),
+        updatedBy: userProfile?.uid
+      }, { merge: true });
+      
+      setAiModelsConfig(newModels);
+    } catch (err) {
+      console.error('Error moving AI model:', err);
     } finally {
       setActionLoading(null);
     }
@@ -722,9 +888,9 @@ export default function Dashboard() {
                   <CardTitle>Чаты поддержки</CardTitle>
                   <CardDescription>Отвечайте на вопросы пользователей. Чаты удаляются через 24 часа.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 p-0 flex overflow-hidden">
+                <CardContent className="flex-1 p-0 flex overflow-hidden relative">
                   {/* Chat List */}
-                  <div className="w-1/3 border-r border-white/5 overflow-y-auto custom-scrollbar">
+                  <div className={`w-full md:w-1/3 border-r border-white/5 overflow-y-auto custom-scrollbar ${activeChatUserId ? 'hidden md:block' : 'block'}`}>
                     {Object.keys(chatsByUser).length === 0 ? (
                       <div className="p-6 text-center text-zinc-500 text-sm">
                         Нет активных чатов
@@ -735,6 +901,7 @@ export default function Dashboard() {
                           const lastMsg = (msgs as SupportMessage[])[(msgs as SupportMessage[]).length - 1];
                           const user = users.find(u => u.uid === userId);
                           const nickname = user?.nickname || 'Неизвестный пользователь';
+                          const isPro = user?.role === 'pro' || (user?.activePromoCode && user.activePromoCode.expiresAt > Date.now());
                           const chat = supportChats[userId];
                           const isClosed = chat?.status === 'closed';
                           
@@ -742,11 +909,16 @@ export default function Dashboard() {
                             <button
                               key={userId}
                               onClick={() => setActiveChatUserId(userId)}
-                              className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${activeChatUserId === userId ? 'bg-blue-900/20' : ''} ${isClosed ? 'opacity-50' : ''}`}
+                              className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${activeChatUserId === userId ? 'bg-blue-900/20' : ''} ${isClosed ? 'opacity-50' : ''} ${isPro ? 'bg-amber-500/5' : ''}`}
                             >
                               <div className="flex justify-between items-start mb-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-zinc-200 truncate">{nickname}</span>
+                                  <span className={`font-bold text-sm truncate ${isPro ? 'text-amber-400' : 'text-zinc-200'}`}>{nickname}</span>
+                                  {isPro && (
+                                    <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase font-black flex items-center gap-0.5">
+                                      <Crown size={8} /> PRO
+                                    </span>
+                                  )}
                                   {isClosed && (
                                     <span className="text-[8px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 uppercase font-black">
                                       Закрыт
@@ -768,45 +940,101 @@ export default function Dashboard() {
                   </div>
 
                   {/* Chat Area */}
-                  <div className="flex-1 flex flex-col bg-black/20">
+                  <div className={`flex-1 flex flex-col bg-black/20 ${activeChatUserId ? 'block' : 'hidden md:flex'}`}>
                     {activeChatUserId ? (
                       <>
-                        <div className="p-4 border-b border-white/5 bg-zinc-900/50 flex justify-between items-center">
-                          <div>
-                            <h3 className="font-bold text-zinc-200">
-                              {users.find(u => u.uid === activeChatUserId)?.nickname || 'Пользователь'}
-                            </h3>
-                            <p className="text-xs text-zinc-500">{users.find(u => u.uid === activeChatUserId)?.email}</p>
+                        <div className="p-4 border-b border-white/5 bg-zinc-900/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <button 
+                              onClick={() => setActiveChatUserId(null)}
+                              className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-white"
+                            >
+                              <ChevronUp className="-rotate-90" size={24} />
+                            </button>
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${users.find(u => u.uid === activeChatUserId)?.nickname}`} alt="Avatar" className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-zinc-200 flex items-center gap-2">
+                                {users.find(u => u.uid === activeChatUserId)?.nickname || 'Пользователь'}
+                                {(users.find(u => u.uid === activeChatUserId)?.role === 'pro' || (users.find(u => u.uid === activeChatUserId)?.activePromoCode && users.find(u => u.uid === activeChatUserId)!.activePromoCode!.expiresAt > Date.now())) && (
+                                  <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 font-black uppercase">PRO</span>
+                                )}
+                              </h3>
+                              <p className="text-xs text-zinc-500">{users.find(u => u.uid === activeChatUserId)?.email}</p>
+                            </div>
                           </div>
-                          {supportChats[activeChatUserId]?.status !== 'closed' && (
+                          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                            {users.find(u => u.uid === activeChatUserId)?.supportBan ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUnbanUser(activeChatUserId)}
+                                className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                                disabled={actionLoading === `unban-${activeChatUserId}`}
+                              >
+                                {actionLoading === `unban-${activeChatUserId}` ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} className="mr-2" />}
+                                Разбанить
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setBanUserId(activeChatUserId)}
+                                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                              >
+                                <ShieldAlert size={14} className="mr-2" />
+                                Забанить
+                              </Button>
+                            )}
+                            
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleCloseChat(activeChatUserId)}
-                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                              disabled={actionLoading === 'close-chat'}
+                              onClick={() => setShowDeleteConfirm(activeChatUserId)}
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              disabled={actionLoading === 'delete-chat'}
                             >
-                              {actionLoading === 'close-chat' ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="mr-2" />}
-                              Закрыть чат
+                              {actionLoading === 'delete-chat' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} className="mr-2" />}
+                              Удалить
                             </Button>
-                          )}
+
+                            {supportChats[activeChatUserId]?.status !== 'closed' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCloseChat(activeChatUserId)}
+                                className="border-zinc-500/30 text-zinc-400 hover:bg-zinc-500/10"
+                                disabled={actionLoading === 'close-chat'}
+                              >
+                                {actionLoading === 'close-chat' ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="mr-2" />}
+                                Закрыть
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                           {activeChatMessages.map((msg) => {
                             const isAdminMsg = msg.isAdmin;
+                            const user = users.find(u => u.uid === msg.userId);
+                            const isPro = user?.role === 'pro' || (user?.activePromoCode && user.activePromoCode.expiresAt > Date.now());
+                            
                             return (
                               <div key={msg.id} className={`flex flex-col ${isAdminMsg ? 'items-start' : 'items-end'}`}>
                                 <div 
-                                  className={`max-w-[80%] p-3 rounded-2xl ${
+                                  className={`max-w-[85%] sm:max-w-[80%] p-3 rounded-2xl ${
                                     isAdminMsg 
                                       ? 'bg-purple-600 text-white rounded-bl-sm shadow-lg shadow-purple-500/20' 
-                                      : 'bg-blue-600 text-white rounded-br-sm shadow-lg shadow-blue-500/20'
+                                      : isPro
+                                        ? 'bg-amber-600 text-white rounded-br-sm shadow-lg shadow-amber-500/30 border border-amber-400/30'
+                                        : 'bg-blue-600 text-white rounded-br-sm shadow-lg shadow-blue-500/20'
                                   }`}
                                 >
                                   <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                                 </div>
                                 <span className="text-[10px] text-zinc-500 mt-1 px-1">
                                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {!isAdminMsg && isPro && <span className="text-amber-500 ml-1 font-bold">PRO</span>}
                                 </span>
                               </div>
                             );
@@ -849,6 +1077,38 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-blue-500/20 text-blue-400 rounded-xl">
+                            <Sparkles size={24} />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-zinc-100">Эффект снега</h3>
+                            <p className="text-xs text-zinc-400">Падающий снег для всех пользователей</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant={isSnowfallEnabled ? 'default' : 'outline'}
+                          className={isSnowfallEnabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-zinc-500/30 text-zinc-400 hover:bg-zinc-500/10'}
+                          onClick={handleToggleSnowfall}
+                          disabled={actionLoading === 'toggle-snow'}
+                        >
+                          {actionLoading === 'toggle-snow' ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <>
+                              <Power size={18} className="mr-2" />
+                              {isSnowfallEnabled ? 'Включено' : 'Отключено'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-zinc-400 leading-relaxed">
+                        Активирует визуальный эффект падающего снега на всех страницах приложения для всех пользователей.
+                      </p>
+                    </div>
+
                     <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -902,6 +1162,76 @@ export default function Dashboard() {
                       <p className="text-xs text-zinc-500">
                         * Показатели нагрузки обновляются в реальном времени. Высокая нагрузка может привести к задержкам в ответах нейросети.
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-bold text-zinc-100 flex items-center gap-2 px-1">
+                      <Cpu size={18} className="text-purple-400" />
+                      Управление моделями Gemini
+                    </h3>
+                    <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+                      <div className="p-4 border-b border-white/5 bg-zinc-900/50">
+                        <p className="text-sm text-zinc-400">
+                          Настройте порядок использования моделей. Верхняя модель будет использоваться первой. Если она недоступна (лимит или ошибка), запрос перейдет к следующей включенной модели.
+                        </p>
+                      </div>
+                      <div className="divide-y divide-white/5">
+                        {[...aiModelsConfig].sort((a, b) => a.priority - b.priority).map((model, index) => (
+                          <div key={model.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col gap-1">
+                                <button 
+                                  onClick={() => handleMoveAiModel(model.id, 'up')}
+                                  disabled={index === 0 || actionLoading !== null}
+                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                                >
+                                  <ChevronUp size={16} />
+                                </button>
+                                <button 
+                                  onClick={() => handleMoveAiModel(model.id, 'down')}
+                                  disabled={index === aiModelsConfig.length - 1 || actionLoading !== null}
+                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                                >
+                                  <ChevronDown size={16} />
+                                </button>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-zinc-200 flex items-center gap-2">
+                                  {model.name}
+                                  {index === 0 && model.enabled && (
+                                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                                      Основная
+                                    </span>
+                                  )}
+                                </h4>
+                                <p className="text-xs text-zinc-500 font-mono mt-1">{model.id}</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant={model.enabled ? 'default' : 'outline'}
+                              size="sm"
+                              className={model.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'}
+                              onClick={() => handleToggleAiModel(model.id)}
+                              disabled={actionLoading === `toggle-model-${model.id}`}
+                            >
+                              {actionLoading === `toggle-model-${model.id}` ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : model.enabled ? (
+                                <>
+                                  <Check size={14} className="mr-1.5" />
+                                  Включена
+                                </>
+                              ) : (
+                                <>
+                                  <XIcon size={14} className="mr-1.5" />
+                                  Отключена
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -1011,6 +1341,114 @@ export default function Dashboard() {
           onUpdateUser={handleUpdateUser}
           isAdmin={isAdmin}
         />
+      )}
+      {/* Ban Modal */}
+      {banUserId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+          >
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-zinc-100">Заблокировать поддержку</h3>
+              <button onClick={() => setBanUserId(null)} className="text-zinc-500 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-400">Причина блокировки</label>
+                <Input 
+                  value={banReason}
+                  onChange={(e) => setBanReason(e.target.value)}
+                  placeholder="Напр: Спам, нецензурная лексика..."
+                  className="bg-zinc-800/50 border-white/10"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-400">Часов</label>
+                  <Input 
+                    type="number"
+                    value={banHours}
+                    onChange={(e) => setBanHours(e.target.value)}
+                    min="0"
+                    className="bg-zinc-800/50 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-400">Минут</label>
+                  <Input 
+                    type="number"
+                    value={banMinutes}
+                    onChange={(e) => setBanMinutes(e.target.value)}
+                    min="0"
+                    max="59"
+                    className="bg-zinc-800/50 border-white/10"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500 italic">
+                Пользователь не сможет отправлять сообщения в поддержку в течение указанного времени.
+              </p>
+            </div>
+            <div className="p-6 bg-zinc-900/50 border-t border-white/5 flex gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1 border-white/10"
+                onClick={() => setBanUserId(null)}
+              >
+                Отмена
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleBanUser}
+                disabled={actionLoading === 'ban-user'}
+              >
+                {actionLoading === 'ban-user' ? <Loader2 size={18} className="animate-spin" /> : 'Заблокировать'}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6"
+          >
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-100">Удалить чат?</h3>
+              <p className="text-sm text-zinc-400">
+                Это действие полностью удалит всю историю переписки для пользователя и для вас. Это действие необратимо.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1 border-white/10"
+                onClick={() => setShowDeleteConfirm(null)}
+                disabled={actionLoading === 'delete-chat'}
+              >
+                Отмена
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => handleDeleteChat(showDeleteConfirm)}
+                disabled={actionLoading === 'delete-chat'}
+              >
+                {actionLoading === 'delete-chat' ? <Loader2 size={18} className="animate-spin" /> : 'Удалить'}
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );

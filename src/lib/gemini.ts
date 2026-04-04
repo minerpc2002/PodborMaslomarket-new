@@ -56,7 +56,7 @@ const productSchema = {
 const recommendationSchema = {
   type: Type.OBJECT,
   properties: {
-    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. ОБЯЗАТЕЛЬНО включи: 'Двигатель', 'АКПП/МКПП', 'Раздаточная коробка', 'Передний мост', 'Задний мост', 'ГУР', 'Тормозная жидкость', 'Антифриз'" },
+    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. ОБЯЗАТЕЛЬНО включи: 'Масло в двигатель', 'Коробка передач', 'Раздаточная коробка', 'Дифференциал, передний', 'Дифференциал, задний', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'" },
     fluid_type: { type: Type.STRING },
     factory_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная заводом-изготовителем" },
     recommended_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная с учетом пробега и условий эксплуатации" },
@@ -109,13 +109,28 @@ function getGeminiClient() {
   return new GoogleGenAI({ apiKey });
 }
 
-const FREE_MODELS = [
-  'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-preview',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3-flash-preview',
-  'gemini-2.5-flash'
-];
+function getEnabledModels(): string[] {
+  try {
+    const state = useAppStore.getState();
+    if (state.aiModelsConfig && state.aiModelsConfig.length > 0) {
+      return state.aiModelsConfig
+        .filter(m => m.enabled)
+        .sort((a, b) => a.priority - b.priority)
+        .map(m => m.id);
+    }
+  } catch (e) {
+    console.error('Failed to get AI models config:', e);
+  }
+  
+  // Default fallback
+  return [
+    'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-preview',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-flash'
+  ];
+}
 
 let currentModelIndex = 0; // Global rotation index
 
@@ -204,10 +219,21 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
 
 async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<any> {
   let attempt = 0;
-  const totalAttempts = retries * FREE_MODELS.length;
+  const models = getEnabledModels();
+  
+  if (models.length === 0) {
+    throw new Error('Все модели ИИ отключены администратором.');
+  }
+
+  const totalAttempts = retries * models.length;
   
   while (attempt < totalAttempts) {
-    const currentModel = FREE_MODELS[currentModelIndex];
+    // Ensure index is within bounds if models array changed
+    if (currentModelIndex >= models.length) {
+      currentModelIndex = 0;
+    }
+    
+    const currentModel = models[currentModelIndex];
     try {
       params.model = currentModel;
       console.log(`Calling Gemini (${currentModel}), attempt ${attempt + 1}/${totalAttempts}...`);
@@ -272,13 +298,13 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
       }
 
       // Rotate immediately on error
-      currentModelIndex = (currentModelIndex + 1) % FREE_MODELS.length;
+      currentModelIndex = (currentModelIndex + 1) % models.length;
       attempt++;
       
       if (attempt < totalAttempts) {
         // Small delay before retry (shorter for quota errors to quickly switch)
-        const delay = isQuotaError ? 300 : Math.pow(2, Math.floor(attempt / FREE_MODELS.length)) * 1000;
-        console.warn(`Переключение на модель ${FREE_MODELS[currentModelIndex]} через ${delay}ms... (Попытка ${attempt + 1}/${totalAttempts})`);
+        const delay = isQuotaError ? 300 : Math.pow(2, Math.floor(attempt / models.length)) * 1000;
+        console.warn(`Переключение на модель ${models[currentModelIndex]} через ${delay}ms... (Попытка ${attempt + 1}/${totalAttempts})`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -337,8 +363,10 @@ export async function suggestCarBodies(brand: string, model: string, year: strin
 Return ONLY a JSON array of strings. Example: ["XV70", "XV50", "ASV70"].`;
 
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) return [];
     const response = await callGeminiWithRetry(ai, {
-      model: FREE_MODELS[0],
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -366,8 +394,10 @@ export async function suggestCarModels(brand: string): Promise<string[]> {
 Return ONLY a JSON array of strings. Example: ["Camry", "Corolla", "RAV4"].`;
 
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) return [];
     const response = await callGeminiWithRetry(ai, {
-      model: 'gemini-3-flash-preview',
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -395,8 +425,10 @@ export async function suggestCarEngines(brand: string, model: string, year: stri
 Return ONLY a JSON array of strings. Example: ["2.5 2AR-FE", "3.5 2GR-FKS", "2.0 M20A-FKS"].`;
 
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) return [];
     const response = await callGeminiWithRetry(ai, {
-      model: 'gemini-3-flash-preview',
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -424,8 +456,10 @@ export async function suggestEnginePower(brand: string, model: string, year: str
 Return ONLY a JSON array of strings. Example: ["181 л.с. / 133 кВт", "249 л.с. / 183 кВт"].`;
 
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) return [];
     const response = await callGeminiWithRetry(ai, {
-      model: 'gemini-3-flash-preview',
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -453,8 +487,10 @@ export async function suggestTransmissions(brand: string, model: string, year: s
 Return ONLY a JSON array of strings. Example: ["АКПП", "МКПП", "Вариатор (CVT)", "Робот (DSG/DCT)"].`;
 
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) return [];
     const response = await callGeminiWithRetry(ai, {
-      model: 'gemini-3-flash-preview',
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -521,7 +557,7 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", list ALL viscosities (e.g., "0W-20, 5W-30"). Include ALL technical information and notes.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Двигатель', 'АКПП/МКПП' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Передний мост', 'Задний мост', 'Раздаточная коробка', 'ГУР', 'Тормозная жидкость', 'Антифриз'.
+   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
    - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
@@ -546,7 +582,7 @@ ${ravenolData.substring(0, 50000)}
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Двигатель', 'АКПП/МКПП' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Передний мост', 'Задний мост', 'Раздаточная коробка', 'ГУР', 'Тормозная жидкость', 'Антифриз'.
+   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
    - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
@@ -559,8 +595,13 @@ ${ravenolData.substring(0, 50000)}
 
   onStatusChange?.('Анализ данных...');
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) {
+      throw new Error('Все модели ИИ отключены администратором.');
+    }
+    
     const response = await callGeminiWithRetry(ai, {
-      model: FREE_MODELS[0],
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -630,7 +671,7 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
        - NO DUPLICATES: You MUST NOT duplicate the same oil/product in the "products" array. Every product in the list MUST be a different, unique product.
        - FACTORY VISCOSITY & INFO: For "factory_viscosity", list ALL viscosities (e.g., "0W-20, 5W-30"). Include ALL technical information and notes.
        - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
-       - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Двигатель', 'АКПП/МКПП' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Передний мост', 'Задний мост', 'Раздаточная коробка', 'ГУР', 'Тормозная жидкость', 'Антифриз'.
+       - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
        - TRANSMISSION: If the car has a robotic transmission (DSG, DCT, PDK, Powershift, etc.), explicitly label the unit as 'Робот (DSG/DCT)'. For CVT, use 'Вариатор'.
        - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
        - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
@@ -656,7 +697,7 @@ ${ravenolData.substring(0, 50000)}
    - FACTORY VISCOSITY & INFO: For "factory_viscosity", you MUST list ALL viscosities mentioned in the catalog (e.g., "0W-20, 5W-30"). You MUST extract and include ALL technical information, notes, and exact volumes from the Ravenol data.
    - IMPORTANT: For each product, list ONLY the approvals and specifications that are DIRECTLY RELEVANT to this specific car's requirements. Do not list all approvals the product has.
    - Adjust "recommended_viscosity" based on: Mileage: ${mileage || 'Not specified'}, Conditions: ${conditions || 'Normal'}, Power: ${power || 'Not specified'}, Hand Drive: ${handDrive || 'Not specified'}, Fuel Type: ${fuelType || 'Not specified'}.
-   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Двигатель', 'АКПП/МКПП' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Передний мост', 'Задний мост', 'Раздаточная коробка', 'ГУР', 'Тормозная жидкость', 'Антифриз'.
+   - CRITICAL: You MUST include ALL relevant units for this vehicle: 'Масло в двигатель', 'Коробка передач' (или 'Робот (DSG/DCT)', 'Вариатор'), 'Дифференциал, передний', 'Дифференциал, задний', 'Раздаточная коробка', 'ГУР', 'Гидравлическая тормозная система, АБС', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'.
    - ОБЯЗАТЕЛЬНО ВЫВЕДИ ВСЕ МАСЛА И АНАЛОГИ ДЛЯ КАЖДОГО УЗЛА БЕЗ ИСКЛЮЧЕНИЯ.
    - ACCURATE ANALOGS: Find technical equivalents from Motul, Bardahl, and Moly Green (if applicable) that match the OEM approvals (допуски) and specifications. If a perfect match for a brand is not found, provide the best available alternative that meets the basic requirements, or skip that specific brand for that unit, but NEVER skip the unit itself.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and Bardahl where they exist.
@@ -668,8 +709,13 @@ ${ravenolData.substring(0, 50000)}
 
   onStatusChange?.('Анализ данных...');
   try {
+    const models = getEnabledModels();
+    if (models.length === 0) {
+      throw new Error('Все модели ИИ отключены администратором.');
+    }
+    
     const response = await callGeminiWithRetry(ai, {
-      model: FREE_MODELS[0],
+      model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
