@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -48,6 +48,8 @@ export default function Dashboard() {
   // AI Settings state
   const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
   const [aiLoad, setAiLoad] = useState(0);
+  const [aiUsage, setAiUsage] = useState<Record<string, any>>({});
+  const [isResettingQuotas, setIsResettingQuotas] = useState(false);
 
   // Support Chat State
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -103,6 +105,17 @@ export default function Dashboard() {
 
       // Simulate AI load
       setAiLoad(Math.floor(Math.random() * 40) + 10); // Random load between 10-50%
+
+      // Listen to AI Usage
+      const usageUnsubscribe = onSnapshot(doc(db, 'settings', 'ai_usage'), (doc) => {
+        if (doc.exists()) {
+          setAiUsage(doc.data());
+        }
+      });
+
+      return () => {
+        usageUnsubscribe();
+      };
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -185,6 +198,24 @@ export default function Dashboard() {
       console.error('Error toggling AI search:', err);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleResetQuotas = async () => {
+    if (!isAdmin) return;
+    if (!window.confirm('Вы уверены, что хотите сбросить все счетчики использования ИИ?')) return;
+    
+    setIsResettingQuotas(true);
+    try {
+      await setDoc(doc(db, 'settings', 'ai_usage'), {
+        last_reset: Date.now(),
+        reset_by: userProfile?.uid || 'admin'
+      });
+      setAiUsage({});
+    } catch (err) {
+      console.error('Error resetting quotas:', err);
+    } finally {
+      setIsResettingQuotas(false);
     }
   };
 
@@ -872,6 +903,98 @@ export default function Dashboard() {
                         * Показатели нагрузки обновляются в реальном времени. Высокая нагрузка может привести к задержкам в ответах нейросети.
                       </p>
                     </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-bold text-zinc-100 flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={18} className="text-amber-400" />
+                        Квоты и лимиты моделей
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleResetQuotas}
+                        disabled={isResettingQuotas}
+                        className="text-[10px] h-7 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                      >
+                        {isResettingQuotas ? <Loader2 size={12} className="animate-spin mr-1" /> : <Trash2 size={12} className="mr-1" />}
+                        Сбросить
+                      </Button>
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {[
+                        { 
+                          name: 'Gemini 3.1 Pro', 
+                          key: 'gemini_3_1_pro_preview_usage', 
+                          limit: 50, 
+                          color: 'purple',
+                          desc: 'Умная модель (Анализ)'
+                        },
+                        { 
+                          name: 'Gemini 3.1 Flash', 
+                          key: 'gemini_3_1_flash_preview_usage', 
+                          limit: 1500, 
+                          color: 'blue',
+                          desc: 'Основная модель (Быстрая)'
+                        },
+                        { 
+                          name: 'Gemini 3.1 Flash Lite', 
+                          key: 'gemini_3_1_flash_lite_preview_usage', 
+                          limit: 1500, 
+                          color: 'emerald',
+                          desc: 'Легкая модель'
+                        },
+                        { 
+                          name: 'Gemini 3.0 Flash', 
+                          key: 'gemini_3_flash_preview_usage', 
+                          limit: 1500, 
+                          color: 'cyan',
+                          desc: 'Базовая модель'
+                        },
+                        { 
+                          name: 'Gemini 2.5 Flash', 
+                          key: 'gemini_2_5_flash_usage', 
+                          limit: 1500, 
+                          color: 'amber',
+                          desc: 'Резервная модель'
+                        }
+                      ].map((model) => {
+                        const usage = aiUsage[model.key] || 0;
+                        const remaining = Math.max(0, model.limit - usage);
+                        const percent = Math.min(100, (usage / model.limit) * 100);
+                        
+                        return (
+                          <div key={model.name} className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-bold text-sm text-zinc-100">{model.name}</h4>
+                                <p className="text-[10px] text-zinc-500">{model.desc}</p>
+                              </div>
+                              <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold bg-${model.color}-500/20 text-${model.color}-400`}>
+                                {remaining} ост.
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px]">
+                                <span className="text-zinc-500">Использовано: {usage}</span>
+                                <span className="text-zinc-400">{Math.round(percent)}%</span>
+                              </div>
+                              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full bg-${model.color}-500 transition-all duration-1000`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-zinc-500 px-1 italic">
+                      * Квоты указаны ориентировочно для текущего расчетного периода. При достижении лимита модель может быть временно недоступна.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
