@@ -174,7 +174,9 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
             { "role": "system", "content": "You are a professional automotive technical assistant. Always respond in Russian. If JSON is requested, output ONLY valid JSON." },
             { "role": "user", "content": finalPrompt }
           ],
-          "temperature": 0.3
+          "temperature": 0.4,
+          "max_tokens": 8192,
+          ...(schema ? { "response_format": { "type": "json_object" } } : {})
         })
       });
 
@@ -564,8 +566,9 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
    - BARDAHL FOR ALL UNITS: You MUST provide Bardahl analogs for ALL units (Engine, Transmission, Differentials, etc.), not just for the engine. Bardahl has a full range of products for all automotive systems.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. ОБЯЗАТЕЛЬНО укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий'), если он указан в данных или общеизвестен для этого стандарта. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
-   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций, ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
+   - ANTIFREEZE (Система охлаждения): ОБЯЗАТЕЛЬНО найди и включи антифриз. Укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий', 'Желтый'). For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - DIFFERENTIALS & TRANSFER CASE: ОБЯЗАТЕЛЬНО найди и включи передний и задний дифференциалы, а также раздаточную коробку.
+   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций (например, с LSD и без), ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
 4. NO Liqui Moly.
 5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array.`;
   } else {
@@ -592,8 +595,9 @@ ${ravenolData.substring(0, 50000)}
    - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. ОБЯЗАТЕЛЬНО укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий'), если он указан в данных или общеизвестен для этого стандарта. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
-   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций, ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
+   - ANTIFREEZE (Система охлаждения): ОБЯЗАТЕЛЬНО найди и включи антифриз. Укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий', 'Желтый'). For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - DIFFERENTIALS & TRANSFER CASE: ОБЯЗАТЕЛЬНО найди и включи передний и задний дифференциалы, а также раздаточную коробку.
+   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций (например, с LSD и без), ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
 5. NO Liqui Moly.
 6. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array. Ensure "factory_viscosity", "volume_liters", and all technical info are exactly as in the catalog.`;
   }
@@ -683,8 +687,9 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
        - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
        - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
        - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-       - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. ОБЯЗАТЕЛЬНО укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий'), если он указан в данных или общеизвестен для этого стандарта. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
-       - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций, ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
+       - ANTIFREEZE (Система охлаждения): ОБЯЗАТЕЛЬНО найди и включи антифриз. Укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий', 'Желтый'). For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+       - DIFFERENTIALS & TRANSFER CASE: ОБЯЗАТЕЛЬНО найди и включи передний и задний дифференциалы, а также раздаточную коробку.
+       - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций (например, с LSD и без), ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
     4. NO Liqui Moly.
     5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array.
     6. IMPORTANT: Add a note in the description of the first unit that this data is provided by AI because the official catalog was unreachable.`;
@@ -711,8 +716,9 @@ ${ravenolData.substring(0, 50000)}
    - MOTUL & BARDAHL FOR ALL UNITS: You MUST provide both Motul and Bardahl analogs for ALL units (Engine, Transmission, Differentials, Brake Fluid, etc.). Motul and Bardahl have full ranges of products (including brake fluids like DOT 4/5.1). Do not skip them.
    - MULTIPLE OPTIONS: For EACH unit, provide 2-3 DIFFERENT products from Ravenol (primary), and at least 1-2 analogs from Motul and 1-2 from Bardahl where they exist.
    - MOLY GREEN: Include Moly Green ONLY if the car is Japanese (JDM) and requires Japanese approvals. For European, American, or Korean cars, DO NOT include Moly Green.
-   - ANTIFREEZE: ONLY include Antifreeze if it is explicitly present in the <technical_data>. ОБЯЗАТЕЛЬНО укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий'), если он указан в данных или общеизвестен для этого стандарта. For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
-   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций, ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
+   - ANTIFREEZE (Система охлаждения): ОБЯЗАТЕЛЬНО найди и включи антифриз. Укажи ЦВЕТ антифриза (например, 'Красный', 'Зеленый', 'Синий', 'Желтый'). For European cars, explicitly state the standard (G11, G12, G12+, G12++, G13) in the fluid_type or description. Provide Ravenol and matching analogs from Motul/Bardahl.
+   - DIFFERENTIALS & TRANSFER CASE: ОБЯЗАТЕЛЬНО найди и включи передний и задний дифференциалы, а также раздаточную коробку.
+   - MODIFICATIONS: Если для одного узла (например, раздаточная коробка или дифференциал) в каталоге указано несколько разных модификаций (например, с LSD и без), ты ДОЛЖЕН вывести КАЖДЫЙ вариант как ОТДЕЛЬНЫЙ объект в массиве 'recommendations' с уточнением в названии.
 4. NO Liqui Moly.
 5. OUTPUT: Return JSON (Russian text). Ensure every unit has multiple UNIQUE products in the "products" array. Ensure "factory_viscosity", "volume_liters", and all technical info are exactly as in the catalog.`;
   }
