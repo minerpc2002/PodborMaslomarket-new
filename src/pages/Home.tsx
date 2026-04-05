@@ -17,11 +17,11 @@ export default function Home() {
         transition={{ delay: 0.1, duration: 0.5 }}
         className="space-y-3 pt-2"
       >
-        <h1 className="text-4xl font-display font-bold tracking-tight leading-tight text-center">
+        <h1 className="text-3xl font-display font-bold tracking-tight leading-tight text-center">
           Умный подбор<br/>
           <span className="text-blue-500">масел и жидкостей</span>
         </h1>
-        <p className="text-zinc-400 text-base">
+        <p className="text-zinc-400 text-sm">
           Профессиональный сервис для точного подбора технических жидкостей
         </p>
       </motion.div>
@@ -35,8 +35,8 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
         >
           <Link to="/search" state={{ tab: 'vin' }} className="block group">
-            <div className="relative overflow-hidden rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 p-[1px] shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 animate-pulse" />
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/40 to-zinc-900/40 backdrop-blur-md border border-white/5 p-[1px] shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 animate-pulse" />
               <div className="relative bg-black/20 rounded-[15px] p-5 text-white overflow-hidden">
                 <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
                   <ScanLine size={100} strokeWidth={1} />
@@ -44,21 +44,21 @@ export default function Home() {
                 
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center border border-blue-500/30">
+                    <div className="w-10 h-10 bg-blue-600/10 rounded-xl flex items-center justify-center border border-blue-500/20">
                       <Sparkles className="text-blue-400" size={20} />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold font-display tracking-tight">По VIN коду</h3>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-medium">AI Анализ</p>
+                      <h3 className="text-sm font-bold font-display tracking-tight">По VIN коду</h3>
+                      <p className="text-[9px] text-zinc-400 uppercase tracking-widest font-medium">AI Анализ</p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 bg-amber-400 text-black text-[9px] font-black uppercase tracking-wider rounded-md shadow-sm">
-                    Beta
+                  <span className="px-2 py-0.5 bg-amber-400/10 text-amber-500 text-[9px] font-black uppercase tracking-wider rounded-md border border-amber-500/20">
+                    pre-Release
                   </span>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-zinc-400 max-w-[160px] leading-snug">
+                  <p className="text-[10px] text-zinc-500 max-w-[160px] leading-snug">
                     Мгновенный подбор по VIN номеру
                   </p>
                   <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">

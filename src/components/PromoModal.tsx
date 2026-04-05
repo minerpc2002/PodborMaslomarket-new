@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Gift, X, CheckCircle2, Clock, Search, Loader2 } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
 import { PromoCode } from '../types';
 import { logUserAction } from '../lib/logger';
 
@@ -15,7 +15,7 @@ interface PromoModalProps {
 }
 
 export default function PromoModal({ isOpen, onClose }: PromoModalProps) {
-  const { activePromoCode, setActivePromoCode, getSearchStatus, userProfile } = useAppStore();
+  const { activePromoCode, setActivePromoCode, getSearchStatus, userProfile, addActivatedPromoCode } = useAppStore();
   const [promoInput, setPromoInput] = useState('');
   const [status, setStatus] = useState({ remainingAttempts: 2, totalAttempts: 2, minutesUntilReset: 0 });
   const [loading, setLoading] = useState(false);
@@ -48,6 +48,12 @@ export default function PromoModal({ isOpen, onClose }: PromoModalProps) {
     setError('');
 
     try {
+      // Check if user already used this code
+      if (userProfile?.activatedPromoCodes?.includes(code)) {
+        setError('Вы уже активировали этот промокод ранее');
+        return;
+      }
+
       const promoDoc = await getDoc(doc(db, 'promocodes', code));
       if (!promoDoc.exists()) {
         setError('Промокод не найден');
@@ -58,6 +64,13 @@ export default function PromoModal({ isOpen, onClose }: PromoModalProps) {
       if (promoData.expiresAt < Date.now()) {
         setError('Срок действия промокода истек');
         return;
+      }
+
+      if (promoData.usedCount !== undefined && promoData.maxActivations !== undefined) {
+        if (promoData.usedCount >= promoData.maxActivations) {
+          setError('Лимит активаций этого промокода исчерпан');
+          return;
+        }
       }
 
       if (isPromoActive) {
@@ -80,9 +93,20 @@ export default function PromoModal({ isOpen, onClose }: PromoModalProps) {
     
     if (userProfile?.uid) {
       try {
-        await updateDoc(doc(db, 'users', userProfile.uid), {
-          activePromoCode: promoData
+        // Increment usedCount
+        await updateDoc(doc(db, 'promocodes', promoData.code), {
+          usedCount: increment(1)
         });
+
+        // Update user profile with the code and add to activated list
+        await updateDoc(doc(db, 'users', userProfile.uid), {
+          activePromoCode: promoData,
+          activatedPromoCodes: arrayUnion(promoData.code)
+        });
+        
+        // Update local state
+        addActivatedPromoCode(promoData.code);
+        
         logUserAction('activate_promo', `Активирован код: ${promoData.code}, лимит: ${promoData.maxAttempts}, до: ${new Date(promoData.expiresAt).toLocaleString()}`);
       } catch (err) {
         console.error('Failed to save promo code to user profile:', err);

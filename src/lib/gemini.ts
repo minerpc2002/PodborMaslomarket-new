@@ -83,6 +83,7 @@ const carDataSchema = {
     engine_type: { type: Type.STRING, description: "'petrol', 'diesel', 'hybrid', or 'gas'" },
     drive: { type: Type.STRING, description: "'fwd', 'rwd', or 'awd'" },
     transmission_type: { type: Type.STRING, description: "'mt', 'at', 'cvt', 'dsg', or 'robot'" },
+    search_type: { type: Type.STRING, description: "'vin' or 'manual'" },
     recommendations: { type: Type.ARRAY, items: recommendationSchema }
   },
   required: ["id", "brand", "model", "year_from", "year_to", "generation", "engine", "engine_code", "engine_type", "drive", "transmission_type", "recommendations"]
@@ -642,6 +643,7 @@ ${ravenolData.substring(0, 50000)}
       });
     }
 
+    carData.search_type = 'vin';
     if (carData.id === 'INVALID_VIN') {
       throw new Error('VIN-код не найден или недействителен');
     }
@@ -763,6 +765,7 @@ ${ravenolData.substring(0, 50000)}
       });
     }
 
+    carData.search_type = 'manual';
     return carData;
   } catch (error) {
     console.error("Gemini failed", error);

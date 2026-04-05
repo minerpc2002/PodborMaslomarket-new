@@ -94,7 +94,9 @@ export default function Result() {
         className="space-y-1"
       >
         <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent ${isDynamic ? 'bg-purple-600 text-white hover:bg-purple-600/80' : 'bg-zinc-800 text-zinc-100 hover:bg-zinc-800/90'}`}>
-          {isDynamic ? 'AI Подбор по VIN' : 'Точное совпадение'}
+          {isDynamic 
+            ? (car.search_type === 'vin' ? 'AI Подбор по VIN' : 'AI Подбор по параметрам') 
+            : 'Точное совпадение'}
         </div>
         <h1 className="text-3xl font-bold tracking-tight mt-2">
           {car.brand} {car.model}

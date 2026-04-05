@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, PromoCode, UserRole, CarData } from '../types';
 import { db } from '../firebase';
-import { doc, updateDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -85,12 +85,21 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, on
         code: `ADMIN_GRANT_${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         expiresAt,
         maxAttempts: parseInt(proAttempts),
+        maxActivations: 1,
+        usedCount: 1,
         createdBy: 'admin',
         createdAt: Date.now()
       };
 
-      await updateDoc(doc(db, 'users', user.uid), { activePromoCode: promo });
-      onUpdateUser({ ...user, activePromoCode: promo });
+      await updateDoc(doc(db, 'users', user.uid), { 
+        activePromoCode: promo,
+        activatedPromoCodes: arrayUnion(promo.code)
+      });
+      onUpdateUser({ 
+        ...user, 
+        activePromoCode: promo,
+        activatedPromoCodes: [...(user.activatedPromoCodes || []), promo.code]
+      });
     } catch (err) {
       console.error('Error granting PRO:', err);
     } finally {

@@ -360,7 +360,7 @@ export default function Search() {
           <TabsTrigger value="vin" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
             По VIN коду
             <span className="px-1.5 py-0.5 bg-amber-400 text-black text-[9px] font-black uppercase tracking-wider rounded-md">
-              Beta
+              pre-Release
             </span>
           </TabsTrigger>
         </TabsList>
@@ -656,9 +656,9 @@ export default function Search() {
                     <div className="p-4 bg-amber-900/20 border border-amber-800 rounded-2xl flex gap-3">
                       <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
-                        <p className="text-sm font-bold text-amber-300">Внимание: BETA версия</p>
+                        <p className="text-sm font-bold text-amber-300">Внимание: pre-Release версия</p>
                         <p className="text-xs text-amber-400 leading-relaxed">
-                          Поиск по VIN находится в стадии активного тестирования.
+                          Поиск по VIN находится в стадии pre-Release.
                           Рекомендуем проверять результаты или использовать ручной поиск.
                         </p>
                       </div>

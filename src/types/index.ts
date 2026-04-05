@@ -38,6 +38,7 @@ export interface CarData {
   drive: 'fwd' | 'rwd' | 'awd';
   transmission_type: 'mt' | 'at' | 'cvt' | 'dsg';
   recommendations: Recommendation[];
+  search_type?: 'vin' | 'manual';
 }
 
 export type UserRole = 'admin' | 'moderator' | 'pro' | 'user';
@@ -55,6 +56,7 @@ export interface UserProfile {
   role: UserRole;
   createdAt: number;
   activePromoCode?: PromoCode | null;
+  activatedPromoCodes?: string[];
   supportBan?: SupportBan | null;
 }
 
@@ -62,6 +64,8 @@ export interface PromoCode {
   code: string;
   expiresAt: number;
   maxAttempts: number;
+  maxActivations: number;
+  usedCount: number;
   createdBy: string;
   createdAt: number;
 }

@@ -31,6 +31,7 @@ interface AppState {
   setIsAiSearchEnabled: (enabled: boolean) => void;
   setAiModelsConfig: (config: AiModelConfig[]) => void;
   setIsSnowfallEnabled: (enabled: boolean) => void;
+  addActivatedPromoCode: (code: string) => void;
   
   recordSearch: () => void;
   getSearchStatus: () => { remainingAttempts: number; totalAttempts: number; minutesUntilReset: number };
@@ -83,6 +84,12 @@ export const useAppStore = create<AppState>()(
       setIsAiSearchEnabled: (enabled) => set({ isAiSearchEnabled: enabled }),
       setAiModelsConfig: (config) => set({ aiModelsConfig: config }),
       setIsSnowfallEnabled: (enabled) => set({ isSnowfallEnabled: enabled }),
+      addActivatedPromoCode: (code) => set((state) => ({
+        userProfile: state.userProfile ? {
+          ...state.userProfile,
+          activatedPromoCodes: [...(state.userProfile.activatedPromoCodes || []), code]
+        } : null
+      })),
       
       recordSearch: () => set((state) => {
         const now = Date.now();

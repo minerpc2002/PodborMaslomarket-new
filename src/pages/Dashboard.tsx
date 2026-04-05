@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [newCode, setNewCode] = useState('');
   const [expiresInDays, setExpiresInDays] = useState('7');
   const [maxAttempts, setMaxAttempts] = useState('10');
+  const [maxActivations, setMaxActivations] = useState('100');
 
   // AI Settings state
   const [isAiSearchEnabled, setIsAiSearchEnabled] = useState(true);
@@ -447,6 +448,8 @@ export default function Dashboard() {
         code,
         expiresAt,
         maxAttempts: parseInt(maxAttempts),
+        maxActivations: parseInt(maxActivations),
+        usedCount: 0,
         createdBy: userProfile.uid,
         createdAt: Date.now()
       };
@@ -801,7 +804,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCreatePromo} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-zinc-400">Код (любой длины)</label>
                         <div className="flex gap-2">
@@ -837,6 +840,15 @@ export default function Dashboard() {
                           type="number" 
                           value={maxAttempts}
                           onChange={(e) => setMaxAttempts(e.target.value)}
+                          min="1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-zinc-400">Лимит активаций</label>
+                        <Input 
+                          type="number" 
+                          value={maxActivations}
+                          onChange={(e) => setMaxActivations(e.target.value)}
                           min="1"
                         />
                       </div>
@@ -879,6 +891,7 @@ export default function Dashboard() {
                           <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
                             <div className="flex flex-col items-start sm:items-end bg-black/20 px-3 py-1.5 rounded-lg">
                               <span className="text-xs text-zinc-300 font-medium">Попыток: {promo.maxAttempts}</span>
+                              <span className="text-[10px] text-zinc-500 font-medium mt-0.5">Активаций: {promo.usedCount || 0} / {promo.maxActivations}</span>
                               <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider mt-1 ${
                                 isExpired ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
                               }`}>
