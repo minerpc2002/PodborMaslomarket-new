@@ -71,13 +71,13 @@ export default function Layout() {
             <motion.div 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-blue-500/50 shadow-lg shadow-blue-500/20 bg-zinc-900 flex items-center justify-center"
+              className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-blue-500/50 shadow-lg shadow-blue-500/20 bg-zinc-900 flex items-center justify-center"
             >
               {/* Fallback icon if logo.png is missing */}
-              <Search size={20} strokeWidth={2.5} className="text-blue-500 absolute z-0" />
+              <Search size={16} strokeWidth={2.5} className="text-blue-500 absolute z-0" />
               {/* New logo from user */}
               <img 
-                src={`/logo.png?t=${Date.now()}`} 
+                src="/logo.png" 
                 alt="Logo" 
                 className="w-full h-full object-cover relative z-10"
                 onError={(e) => (e.currentTarget.style.display = 'none')}
