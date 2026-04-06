@@ -6,6 +6,41 @@ import { useAppStore } from '../store/useAppStore';
 import { db } from '../firebase';
 import { doc, setDoc, increment, serverTimestamp } from 'firebase/firestore';
 
+function parseJsonFromAiResponse(text: string): any {
+  if (!text) return null;
+  let cleaned = text.trim();
+  
+  // Clean up markdown wrapping if present
+  if (cleaned.includes('```json')) {
+    cleaned = cleaned.split('```json')[1].split('```')[0].trim();
+  } else if (cleaned.includes('```')) {
+    cleaned = cleaned.split('```')[1].split('```')[0].trim();
+  }
+  
+  // Fallback: extract substring from first '{' to last '}' OR first '[' to last ']'
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  const firstBracket = cleaned.indexOf('[');
+  const lastBracket = cleaned.lastIndexOf(']');
+  
+  const isObject = firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace;
+  const isArray = firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket;
+  
+  if (isObject && isArray) {
+    if (firstBrace < firstBracket) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    } else {
+      cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+    }
+  } else if (isObject) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  } else if (isArray) {
+    cleaned = cleaned.substring(firstBracket, lastBracket + 1);
+  }
+  
+  return JSON.parse(cleaned);
+}
+
 async function trackAiUsage(model: string) {
   try {
     const usageDoc = doc(db, 'settings', 'ai_usage');
@@ -383,7 +418,7 @@ Return ONLY a JSON array of strings. Example: ["XV70", "XV50", "ASV70"].`;
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as string[];
+    return parseJsonFromAiResponse(text) as string[];
   } catch (error) {
     console.error("Gemini failed", error);
     return [];
@@ -414,7 +449,7 @@ Return ONLY a JSON array of strings. Example: ["Camry", "Corolla", "RAV4"].`;
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as string[];
+    return parseJsonFromAiResponse(text) as string[];
   } catch (error) {
     console.error("Gemini failed", error);
     return [];
@@ -445,7 +480,7 @@ Return ONLY a JSON array of strings. Example: ["2.5 2AR-FE", "3.5 2GR-FKS", "2.0
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as string[];
+    return parseJsonFromAiResponse(text) as string[];
   } catch (error) {
     console.error("Gemini failed", error);
     return [];
@@ -476,7 +511,7 @@ Return ONLY a JSON array of strings. Example: ["181 л.с. / 133 кВт", "249 �
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as string[];
+    return parseJsonFromAiResponse(text) as string[];
   } catch (error) {
     console.error("Gemini failed", error);
     return [];
@@ -507,7 +542,7 @@ Return ONLY a JSON array of strings. Example: ["АКПП", "МКПП", "Вари
 
     const text = response.text;
     if (!text) return [];
-    return JSON.parse(text) as string[];
+    return parseJsonFromAiResponse(text) as string[];
   } catch (error) {
     console.error("Gemini failed", error);
     return [];
@@ -626,7 +661,7 @@ ${ravenolData.substring(0, 50000)}
     
     let carData: CarData;
     try {
-      carData = JSON.parse(text) as CarData;
+      carData = parseJsonFromAiResponse(text) as CarData;
     } catch (e) {
       console.error("Failed to parse JSON from Gemini:", text);
       throw new Error(`Ошибка парсинга ответа ИИ: ${text.substring(0, 50)}...`);
@@ -748,7 +783,7 @@ ${ravenolData.substring(0, 50000)}
     
     let carData: CarData;
     try {
-      carData = JSON.parse(text) as CarData;
+      carData = parseJsonFromAiResponse(text) as CarData;
     } catch (e) {
       console.error("Failed to parse JSON from Gemini:", text);
       throw new Error(`Ошибка парсинга ответа ИИ: ${text.substring(0, 50)}...`);
