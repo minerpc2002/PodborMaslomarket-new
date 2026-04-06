@@ -28,6 +28,8 @@
     -webkit-backdrop-filter: blur(25px) saturate(200%);
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    /* Prevent background and filter transitions to avoid flickering on mount */
+    transition-property: transform, opacity, box-shadow, border-color !important;
   }
 
   .liquid-glass-heavy {
@@ -36,6 +38,8 @@
     -webkit-backdrop-filter: blur(40px) saturate(220%);
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
+    /* Prevent background and filter transitions to avoid flickering on mount */
+    transition-property: transform, opacity, box-shadow, border-color !important;
   }
 }
 

@@ -17,11 +17,11 @@ export default function Home() {
         transition={{ delay: 0.1, duration: 0.5 }}
         className="space-y-3 pt-2"
       >
-        <h1 className="text-3xl font-display font-bold tracking-tight leading-tight text-center">
+        <h1 className="text-4xl md:text-5xl font-display font-bold tracking-tight leading-[1.1] text-center bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-500">
           Умный подбор<br/>
-          <span className="text-blue-500">масел и жидкостей</span>
+          <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">масел и жидкостей</span>
         </h1>
-        <p className="text-zinc-400 text-sm">
+        <p className="text-zinc-400 text-sm md:text-base max-w-[280px] mx-auto text-center leading-relaxed">
           Профессиональный сервис для точного подбора технических жидкостей
         </p>
       </motion.div>
@@ -35,11 +35,11 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
         >
           <Link to="/search" state={{ tab: 'vin' }} className="block group">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-800/40 to-zinc-900/40 backdrop-blur-md border border-white/5 p-[1px] shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10 animate-pulse" />
-              <div className="relative bg-black/20 rounded-[15px] p-5 text-white overflow-hidden">
-                <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
-                  <ScanLine size={100} strokeWidth={1} />
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-800/60 to-zinc-900/60 backdrop-blur-xl border border-white/10 p-[1px] shadow-2xl transition-[shadow,transform] duration-500 hover:shadow-blue-500/10">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 animate-pulse opacity-50" />
+              <div className="relative bg-black/40 rounded-[23px] p-6 text-white overflow-hidden">
+                <div className="absolute -right-6 -top-6 opacity-10 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700">
+                  <ScanLine size={120} strokeWidth={1} />
                 </div>
                 
                 <div className="flex items-center justify-between mb-3">
@@ -78,19 +78,21 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
         >
           <Link to="/search" state={{ tab: 'manual' }}>
-            <Card className="rounded-3xl border-none shadow-sm liquid-glass hover:shadow-xl transition-all group">
+            <Card className="rounded-3xl border border-white/5 shadow-xl liquid-glass hover:shadow-blue-500/5 transition-[shadow,transform] group overflow-hidden">
               <CardHeader className="p-6">
                 <div className="flex items-center gap-4">
-                  <div className="p-3.5 bg-zinc-800 text-zinc-300 rounded-2xl group-hover:scale-110 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
+                  <div className="p-4 bg-zinc-800/80 text-zinc-300 rounded-2xl group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-inner">
                     <Search size={24} />
                   </div>
                   <div className="flex-1">
-                    <CardTitle className="text-lg font-display flex items-center gap-2">
+                    <CardTitle className="text-lg font-display font-bold flex items-center gap-2">
                       По автомобилю
                     </CardTitle>
-                    <CardDescription className="text-sm mt-0.5">Марка, модель, год, двигатель</CardDescription>
+                    <CardDescription className="text-sm mt-0.5 text-zinc-400">Марка, модель, год, двигатель</CardDescription>
                   </div>
-                  <ArrowRight size={20} className="text-zinc-700 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-zinc-100 group-hover:text-zinc-900 transition-all duration-300">
+                    <ArrowRight size={18} />
+                  </div>
                 </div>
               </CardHeader>
             </Card>

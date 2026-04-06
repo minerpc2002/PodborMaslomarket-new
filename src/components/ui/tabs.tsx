@@ -38,7 +38,7 @@ export const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
     <div
       ref={ref}
       className={cn(
-        "inline-flex h-12 items-center justify-center rounded-xl bg-zinc-800 p-1 text-zinc-400",
+        "inline-flex h-12 items-center justify-center rounded-xl p-1 text-zinc-400",
         className
       )}
       {...props}
@@ -62,7 +62,7 @@ export const TabsTrigger = React.forwardRef<
       aria-selected={isSelected}
       onClick={() => onValueChange(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-zinc-950 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-zinc-950 data-[state=active]:text-zinc-50 data-[state=active]:shadow-sm",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-zinc-950 transition-[background-color,color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-zinc-950 data-[state=active]:text-zinc-50 data-[state=active]:shadow-sm",
         className
       )}
       data-state={isSelected ? "active" : "inactive"}
