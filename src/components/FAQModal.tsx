@@ -41,7 +41,7 @@ export default function FAQModal({ isOpen, onClose }: FAQModalProps) {
                   <HelpCircle className="text-blue-400" size={28} />
                 </div>
                 <CardTitle className="text-2xl font-display font-bold">Часто задаваемые вопросы</CardTitle>
-                <CardDescription>Помощь по работе сервиса MasloMARKET AI</CardDescription>
+                <CardDescription>Помощь по работе сервиса MasloMarket AI</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-4 overflow-y-auto">
                 <div className="space-y-4">
