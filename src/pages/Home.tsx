@@ -35,7 +35,7 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
         >
           <Link to="/search" state={{ tab: 'vin' }} className="block group">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-800/60 to-zinc-900/60 backdrop-blur-xl border border-white/10 p-[1px] shadow-2xl transition-[shadow,transform] duration-500 hover:shadow-blue-500/10">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-800/60 to-zinc-900/60 backdrop-blur-xl border border-white/10 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-blue-500/10">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 animate-pulse opacity-50" />
               <div className="relative bg-black/40 rounded-[23px] p-6 text-white overflow-hidden">
                 <div className="absolute -right-6 -top-6 opacity-10 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700">
@@ -78,7 +78,7 @@ export default function Home() {
           whileTap={{ scale: 0.98 }}
         >
           <Link to="/search" state={{ tab: 'manual' }}>
-            <Card className="rounded-3xl border border-white/5 shadow-xl liquid-glass hover:shadow-blue-500/5 transition-[shadow,transform] group overflow-hidden">
+            <Card className="rounded-3xl border border-white/5 shadow-xl liquid-glass hover:shadow-blue-500/5 transition-all group overflow-hidden">
               <CardHeader className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-4 bg-zinc-800/80 text-zinc-300 rounded-2xl group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300 shadow-inner">

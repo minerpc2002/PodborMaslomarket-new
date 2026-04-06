@@ -353,33 +353,28 @@ export default function Search() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="relative mb-4 rounded-2xl">
-          <div className="absolute inset-0 liquid-glass z-0 rounded-2xl" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
-          <TabsList className="grid w-full grid-cols-2 p-1 relative z-10 bg-transparent">
-            <TabsTrigger value="manual" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
-              По автомобилю
-            </TabsTrigger>
-            <TabsTrigger value="vin" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
-              По VIN коду
-              <span className="px-1.5 py-0.5 bg-amber-400 text-black text-[9px] font-black uppercase tracking-wider rounded-md">
-                pre-Release
-              </span>
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="grid w-full grid-cols-2 mb-4 liquid-glass p-1 rounded-2xl">
+          <TabsTrigger value="manual" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
+            По автомобилю
+          </TabsTrigger>
+          <TabsTrigger value="vin" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
+            По VIN коду
+            <span className="px-1.5 py-0.5 bg-amber-400 text-black text-[9px] font-black uppercase tracking-wider rounded-md">
+              pre-Release
+            </span>
+          </TabsTrigger>
+        </TabsList>
         
-        <div className="relative rounded-3xl overflow-hidden min-h-[400px] shadow-xl">
-          <div className="absolute inset-0 liquid-glass z-0" style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }} />
-          <div className="relative z-10 h-full">
-            <AnimatePresence mode="wait">
-            {activeTab === 'manual' && (
-              <TabsContent value="manual" key="manual" forceMount className="mt-0 outline-none">
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.2 }}
-                >
+        <AnimatePresence mode="wait">
+          {activeTab === 'manual' && (
+            <TabsContent value="manual" key="manual" forceMount>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="border-none shadow-xl liquid-glass rounded-3xl overflow-hidden">
                   <CardContent className="pt-6 space-y-5">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-zinc-300">Марка автомобиля</label>
@@ -643,18 +638,20 @@ export default function Search() {
                       )}
                     </Button>
                   </CardContent>
-                </motion.div>
-              </TabsContent>
-            )}
-            
-            {activeTab === 'vin' && (
-              <TabsContent value="vin" key="vin" forceMount className="mt-0 outline-none">
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.2 }}
-                >
+                </Card>
+              </motion.div>
+            </TabsContent>
+          )}
+          
+          {activeTab === 'vin' && (
+            <TabsContent value="vin" key="vin" forceMount>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="border-none shadow-xl liquid-glass rounded-3xl overflow-hidden">
                   <CardContent className="pt-6 space-y-5">
                     <div className="p-4 bg-amber-900/20 border border-amber-800 rounded-2xl flex gap-3">
                       <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
@@ -721,12 +718,11 @@ export default function Search() {
                       )}
                     </Button>
                   </CardContent>
-                </motion.div>
-              </TabsContent>
-            )}
-          </AnimatePresence>
-          </div>
-        </div>
+                </Card>
+              </motion.div>
+            </TabsContent>
+          )}
+        </AnimatePresence>
       </Tabs>
     </div>
   );
