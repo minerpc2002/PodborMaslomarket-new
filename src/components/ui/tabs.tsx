@@ -12,28 +12,33 @@ const TabsContext = React.createContext<{
   onValueChange: (value: string) => void;
 }>({ value: '', onValueChange: () => {} });
 
-export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
+export const Tabs = React.memo(React.forwardRef<HTMLDivElement, TabsProps>(
   ({ className, defaultValue, value, onValueChange, children, ...props }, ref) => {
     const [internalValue, setInternalValue] = React.useState(defaultValue);
     
     const currentValue = value !== undefined ? value : internalValue;
-    const handleValueChange = (newValue: string) => {
+    const handleValueChange = React.useCallback((newValue: string) => {
       setInternalValue(newValue);
       onValueChange?.(newValue);
-    };
+    }, [onValueChange]);
+
+    const contextValue = React.useMemo(() => ({ 
+      value: currentValue, 
+      onValueChange: handleValueChange 
+    }), [currentValue, handleValueChange]);
 
     return (
-      <TabsContext.Provider value={{ value: currentValue, onValueChange: handleValueChange }}>
+      <TabsContext.Provider value={contextValue}>
         <div ref={ref} className={cn("w-full", className)} {...props}>
           {children}
         </div>
       </TabsContext.Provider>
     )
   }
-)
+))
 Tabs.displayName = "Tabs"
 
-export const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+export const TabsList = React.memo(React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
@@ -44,10 +49,10 @@ export const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       {...props}
     />
   )
-)
+))
 TabsList.displayName = "TabsList"
 
-export const TabsTrigger = React.forwardRef<
+export const TabsTrigger = React.memo(React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }
 >(({ className, value, ...props }, ref) => {
@@ -69,10 +74,10 @@ export const TabsTrigger = React.forwardRef<
       {...props}
     />
   )
-})
+}))
 TabsTrigger.displayName = "TabsTrigger"
 
-export const TabsContent = React.forwardRef<
+export const TabsContent = React.memo(React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { value: string; forceMount?: boolean }
 >(({ className, value, forceMount, children, ...props }, ref) => {
@@ -94,5 +99,5 @@ export const TabsContent = React.forwardRef<
       {children}
     </div>
   )
-})
+}))
 TabsContent.displayName = "TabsContent"

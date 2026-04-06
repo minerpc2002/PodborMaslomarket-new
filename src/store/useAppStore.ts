@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CarData, UserProfile, PromoCode, AiModelConfig } from '../types';
+import { CarData, UserProfile, PromoCode, AiModelConfig, Notification, BackgroundSearch } from '../types';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -17,10 +17,13 @@ interface AppState {
   isAiSearchEnabled: boolean;
   aiModelsConfig: AiModelConfig[];
   isSnowfallEnabled: boolean;
+  activeSearches: BackgroundSearch[];
+  notifications: Notification[];
   
   addFavorite: (car: CarData) => void;
   removeFavorite: (carId: string) => void;
-  addToHistory: (car: CarData) => void;
+  addToHistory: (car: CarData, isNew?: boolean) => void;
+  markAsViewed: (carId: string) => void;
   clearHistory: () => void;
   addDynamicCar: (car: CarData) => void;
   
@@ -32,6 +35,12 @@ interface AppState {
   setAiModelsConfig: (config: AiModelConfig[]) => void;
   setIsSnowfallEnabled: (enabled: boolean) => void;
   addActivatedPromoCode: (code: string) => void;
+  
+  addActiveSearch: (search: BackgroundSearch) => void;
+  removeActiveSearch: (searchId: string) => void;
+  addNotification: (notification: Notification) => void;
+  removeNotification: (notificationId: string) => void;
+  clearNotifications: () => void;
   
   recordSearch: () => void;
   getSearchStatus: () => { remainingAttempts: number; totalAttempts: number; minutesUntilReset: number };
@@ -58,6 +67,8 @@ export const useAppStore = create<AppState>()(
         { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 5 }
       ],
       isSnowfallEnabled: false,
+      activeSearches: [],
+      notifications: [],
       
       addFavorite: (car) => set((state) => ({ 
         favorites: state.favorites.some(f => f.id === car.id) 
@@ -67,10 +78,14 @@ export const useAppStore = create<AppState>()(
       removeFavorite: (carId) => set((state) => ({ 
         favorites: state.favorites.filter(f => f.id !== carId) 
       })),
-      addToHistory: (car) => set((state) => {
+      addToHistory: (car, isNew = false) => set((state) => {
         const newHistory = state.history.filter(h => h.id !== car.id);
-        return { history: [car, ...newHistory].slice(0, 10) };
+        const carWithStatus = { ...car, isNew };
+        return { history: [carWithStatus, ...newHistory].slice(0, 10) };
       }),
+      markAsViewed: (carId) => set((state) => ({
+        history: state.history.map(h => h.id === carId ? { ...h, isNew: false } : h)
+      })),
       clearHistory: () => set({ history: [] }),
       addDynamicCar: (car) => set((state) => {
         const newDynamic = state.dynamicCars.filter(c => c.id !== car.id);
@@ -90,6 +105,20 @@ export const useAppStore = create<AppState>()(
           activatedPromoCodes: [...(state.userProfile.activatedPromoCodes || []), code]
         } : null
       })),
+
+      addActiveSearch: (search) => set((state) => ({
+        activeSearches: [...state.activeSearches, search]
+      })),
+      removeActiveSearch: (searchId) => set((state) => ({
+        activeSearches: state.activeSearches.filter(s => s.id !== searchId)
+      })),
+      addNotification: (notification) => set((state) => ({
+        notifications: [notification, ...state.notifications].slice(0, 5)
+      })),
+      removeNotification: (notificationId) => set((state) => ({
+        notifications: state.notifications.filter(n => n.id !== notificationId)
+      })),
+      clearNotifications: () => set({ notifications: [] }),
       
       recordSearch: () => set((state) => {
         const now = Date.now();

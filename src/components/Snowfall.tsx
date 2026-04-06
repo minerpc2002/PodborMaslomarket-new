@@ -12,7 +12,8 @@ interface Snowflake {
 
 export default function Snowfall() {
   const snowflakes = useMemo(() => {
-    const count = 50;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const count = isMobile ? 20 : 50;
     const flakes: Snowflake[] = [];
     for (let i = 0; i < count; i++) {
       flakes.push({

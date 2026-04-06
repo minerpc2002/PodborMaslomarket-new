@@ -5,7 +5,7 @@ import { cn } from "@/src/lib/utils"
 export interface SelectProps
   extends React.SelectHTMLAttributes<HTMLSelectElement> {}
 
-const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
+const Select = React.memo(React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
     return (
       <select
@@ -20,7 +20,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       </select>
     )
   }
-)
+))
 Select.displayName = "Select"
 
 export { Select }

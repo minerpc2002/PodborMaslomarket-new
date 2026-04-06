@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function History() {
-  const { history, clearHistory } = useAppStore();
+  const { history, clearHistory, markAsViewed } = useAppStore();
 
   return (
     <motion.div 
@@ -55,16 +55,25 @@ export default function History() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: idx * 0.05, duration: 0.3 }}
               >
-                <Link to={`/result/${car.id}`}>
-                  <Card className="hover:border-blue-500 transition-colors cursor-pointer group">
+                <Link to={`/result/${car.id}`} onClick={() => markAsViewed(car.id)}>
+                  <Card className={`hover:border-blue-500 transition-all cursor-pointer group relative overflow-hidden ${car.isNew ? 'border-blue-500/50 bg-blue-500/5 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'liquid-glass'}`}>
+                    {car.isNew && (
+                      <div className="absolute top-0 right-0">
+                        <div className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-lg animate-pulse">
+                          НОВОЕ
+                        </div>
+                      </div>
+                    )}
                     <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
                       <div>
-                        <CardTitle className="text-lg">{car.brand} {car.model}</CardTitle>
+                        <CardTitle className={`text-lg transition-colors ${car.isNew ? 'text-blue-400' : ''}`}>
+                          {car.brand} {car.model}
+                        </CardTitle>
                         <CardDescription className="mt-1">
                           {car.year_from}-{car.year_to} • {car.engine} ({car.engine_code})
                         </CardDescription>
                       </div>
-                      <ChevronRight className="text-zinc-400 group-hover:text-blue-500 transition-colors" />
+                      <ChevronRight className={`transition-colors ${car.isNew ? 'text-blue-500' : 'text-zinc-400 group-hover:text-blue-500'}`} />
                     </CardHeader>
                   </Card>
                 </Link>

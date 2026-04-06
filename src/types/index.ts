@@ -39,6 +39,24 @@ export interface CarData {
   transmission_type: 'mt' | 'at' | 'cvt' | 'dsg';
   recommendations: Recommendation[];
   search_type?: 'vin' | 'manual';
+  isNew?: boolean;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  carId?: string;
+  createdAt: number;
+}
+
+export interface BackgroundSearch {
+  id: string;
+  type: 'vin' | 'manual';
+  query: string;
+  status: 'searching' | 'completed' | 'error';
+  createdAt: number;
 }
 
 export type UserRole = 'admin' | 'moderator' | 'pro' | 'user';

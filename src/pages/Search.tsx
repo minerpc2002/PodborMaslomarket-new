@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search as SearchIcon, ScanLine, Loader2, Settings2, Sparkles, ChevronRight, Info, HelpCircle, X, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
@@ -10,6 +10,7 @@ import { searchByVin, searchByCarDetails, suggestCarBodies, suggestCarModels, su
 import { useAppStore } from '../store/useAppStore';
 import { logUserAction } from '../lib/logger';
 import { motion, AnimatePresence } from 'motion/react';
+import { v4 as uuidv4 } from 'uuid';
 
 const POPULAR_BRANDS = [
   'Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru', 'Mitsubishi', 'Suzuki', 'Lexus', 'Infiniti', 'Acura',
@@ -24,7 +25,13 @@ const YEARS = Array.from({ length: 2026 - 1990 + 1 }, (_, i) => (2026 - i).toStr
 export default function Search() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { addDynamicCar, canSearch, recordSearch } = useAppStore();
+  const { addDynamicCar, canSearch, recordSearch, addActiveSearch, removeActiveSearch, addNotification, addToHistory } = useAppStore();
+  
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
   
   const defaultTab = location.state?.tab || 'manual';
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -63,7 +70,7 @@ export default function Search() {
   const [transmissionSuggestions, setTransmissionSuggestions] = useState<string[]>([]);
   const [isLoadingTransmissions, setIsLoadingTransmissions] = useState(false);
 
-  const fetchModels = async () => {
+  const fetchModels = useCallback(async () => {
     if (!brand) return;
     setIsLoadingModels(true);
     try {
@@ -74,9 +81,9 @@ export default function Search() {
     } finally {
       setIsLoadingModels(false);
     }
-  };
+  }, [brand]);
 
-  const fetchBodies = async () => {
+  const fetchBodies = useCallback(async () => {
     if (!brand || !model || !year) return;
     setIsLoadingBodies(true);
     try {
@@ -87,9 +94,9 @@ export default function Search() {
     } finally {
       setIsLoadingBodies(false);
     }
-  };
+  }, [brand, model, year]);
 
-  const fetchEngines = async () => {
+  const fetchEngines = useCallback(async () => {
     if (!brand || !model || !year || !body) return;
     setIsLoadingEngines(true);
     try {
@@ -100,9 +107,9 @@ export default function Search() {
     } finally {
       setIsLoadingEngines(false);
     }
-  };
+  }, [brand, model, year, body]);
 
-  const fetchPower = async () => {
+  const fetchPower = useCallback(async () => {
     if (!brand || !model || !year || !body || !engine) return;
     setIsLoadingPower(true);
     try {
@@ -113,9 +120,9 @@ export default function Search() {
     } finally {
       setIsLoadingPower(false);
     }
-  };
+  }, [brand, model, year, body, engine]);
 
-  const fetchTransmissions = async () => {
+  const fetchTransmissions = useCallback(async () => {
     if (!brand || !model || !year || !body || !engine) return;
     setIsLoadingTransmissions(true);
     try {
@@ -126,7 +133,7 @@ export default function Search() {
     } finally {
       setIsLoadingTransmissions(false);
     }
-  };
+  }, [brand, model, year, body, engine]);
 
   // VIN Search State
   const [vin, setVin] = useState('');
@@ -156,18 +163,59 @@ export default function Search() {
     setManualError('');
     setSearchStatus('Инициализация...');
     
+    const searchId = uuidv4();
+    const searchQuery = `${brand} ${model} ${year} ${body}`;
+    
+    addActiveSearch({
+      id: searchId,
+      type: 'manual',
+      query: searchQuery,
+      status: 'searching',
+      createdAt: Date.now()
+    });
+    
     try {
-      const carData = await searchByCarDetails(brand, model, year, body, engine, transmission, mileage, conditions, power, handDrive, fuelType, (status) => setSearchStatus(status));
+      const carData = await searchByCarDetails(brand, model, year, body, engine, transmission, mileage, conditions, power, handDrive, fuelType, (status) => {
+        if (isMounted.current) setSearchStatus(status);
+      });
+      
       recordSearch();
       addDynamicCar(carData);
+      addToHistory(carData, !isMounted.current);
       logUserAction('search_manual', `Поиск по авто: ${brand} ${model} ${year} ${body} ${engine} ${transmission}`);
-      navigate(`/result/${carData.id}`);
+      
+      if (isMounted.current) {
+        navigate(`/result/${carData.id}`);
+      } else {
+        addNotification({
+          id: uuidv4(),
+          title: 'Поиск завершен',
+          message: `Найден автомобиль: ${carData.brand} ${carData.model}`,
+          type: 'success',
+          carId: carData.id,
+          createdAt: Date.now()
+        });
+      }
     } catch (error: any) {
       console.error('Manual Search Error:', error);
-      setManualError(error.message || 'Не удалось найти данные по этому автомобилю. Проверьте правильность ввода.');
+      const errorMessage = error.message || 'Не удалось найти данные по этому автомобилю. Проверьте правильность ввода.';
+      if (isMounted.current) {
+        setManualError(errorMessage);
+      } else {
+        addNotification({
+          id: uuidv4(),
+          title: 'Ошибка поиска',
+          message: errorMessage,
+          type: 'error',
+          createdAt: Date.now()
+        });
+      }
     } finally {
-      setIsSearchingManual(false);
-      setSearchStatus('');
+      removeActiveSearch(searchId);
+      if (isMounted.current) {
+        setIsSearchingManual(false);
+        setSearchStatus('');
+      }
     }
   };
 
@@ -187,18 +235,57 @@ export default function Search() {
     setVinError('');
     setSearchStatus('Инициализация...');
     
+    const searchId = uuidv4();
+    addActiveSearch({
+      id: searchId,
+      type: 'vin',
+      query: vin,
+      status: 'searching',
+      createdAt: Date.now()
+    });
+    
     try {
-      const carData = await searchByVin(vin, mileage, conditions, power, handDrive, fuelType, (status) => setSearchStatus(status));
+      const carData = await searchByVin(vin, mileage, conditions, power, handDrive, fuelType, (status) => {
+        if (isMounted.current) setSearchStatus(status);
+      });
+      
       recordSearch();
       addDynamicCar(carData);
+      addToHistory(carData, !isMounted.current);
       logUserAction('search_vin', `Поиск по VIN: ${vin}`);
-      navigate(`/result/${carData.id}`);
+      
+      if (isMounted.current) {
+        navigate(`/result/${carData.id}`);
+      } else {
+        addNotification({
+          id: uuidv4(),
+          title: 'Поиск по VIN завершен',
+          message: `Найден автомобиль: ${carData.brand} ${carData.model}`,
+          type: 'success',
+          carId: carData.id,
+          createdAt: Date.now()
+        });
+      }
     } catch (error: any) {
       console.error('VIN Search Error:', error);
-      setVinError(error.message || 'Не удалось распознать VIN или найти данные. Попробуйте ручной поиск.');
+      const errorMessage = error.message || 'Не удалось распознать VIN или найти данные. Попробуйте ручной поиск.';
+      if (isMounted.current) {
+        setVinError(errorMessage);
+      } else {
+        addNotification({
+          id: uuidv4(),
+          title: 'Ошибка поиска по VIN',
+          message: errorMessage,
+          type: 'error',
+          createdAt: Date.now()
+        });
+      }
     } finally {
-      setIsSearchingVin(false);
-      setSearchStatus('');
+      removeActiveSearch(searchId);
+      if (isMounted.current) {
+        setIsSearchingVin(false);
+        setSearchStatus('');
+      }
     }
   };
 

@@ -13,12 +13,20 @@ import SupportChatModal from './SupportChatModal';
 import { useAppStore } from '../store/useAppStore';
 import { motion, AnimatePresence } from 'motion/react';
 import { signOut } from 'firebase/auth';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Loader2 } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
+
+const navItems = [
+  { path: '/', icon: Home, label: 'Главная' },
+  { path: '/search', icon: Search, label: 'Подбор' },
+  { path: '/history', icon: History, label: 'История' },
+  { path: '/favorites', icon: Heart, label: 'Избранное' },
+];
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { userProfile, activePromoCode } = useAppStore();
+  const { userProfile, activePromoCode, activeSearches, history } = useAppStore();
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [isFAQModalOpen, setIsFAQModalOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
@@ -28,13 +36,6 @@ export default function Layout() {
   useEffect(() => {
     setupTelegram();
   }, []);
-
-  const navItems = [
-    { path: '/', icon: Home, label: 'Главная' },
-    { path: '/search', icon: Search, label: 'Подбор' },
-    { path: '/history', icon: History, label: 'История' },
-    { path: '/favorites', icon: Heart, label: 'Избранное' },
-  ];
 
   const isPromoActive = activePromoCode && activePromoCode.expiresAt > Date.now();
   const isStaff = userProfile?.role === 'admin' || 
@@ -48,6 +49,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-zinc-50 font-sans transition-colors duration-300">
+      <NotificationCenter />
       <AuthModal />
       <UserMenuModal 
         isOpen={isUserMenuOpen} 
@@ -128,6 +130,17 @@ export default function Layout() {
               <Info size={20} />
             </motion.button>
 
+            {activeSearches.length > 0 && (
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 border border-blue-500/30 rounded-full ml-1"
+              >
+                <Loader2 size={14} className="text-blue-400 animate-spin" />
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Поиск...</span>
+              </motion.div>
+            )}
+
             {userProfile ? (
               <motion.button 
                 whileHover={{ scale: 1.05 }}
@@ -191,7 +204,7 @@ export default function Layout() {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    "flex flex-col items-center justify-center w-16 h-full gap-1 text-[10px] font-medium transition-all duration-200",
+                    "flex flex-col items-center justify-center w-16 h-full gap-1 text-[10px] font-medium transition-all duration-200 relative",
                     isActive 
                       ? "text-blue-400 scale-105" 
                       : "text-zinc-500 hover:text-zinc-300"
@@ -204,6 +217,14 @@ export default function Layout() {
                     <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                   </motion.div>
                   <span>{item.label}</span>
+                  
+                  {item.path === '/history' && activeSearches.length > 0 && (
+                    <div className="absolute top-2 right-3 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                  )}
+                  
+                  {item.path === '/history' && history.some(h => h.isNew) && (
+                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-[#000002]" />
+                  )}
                 </Link>
               );
             })}
