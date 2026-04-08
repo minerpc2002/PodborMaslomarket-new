@@ -645,13 +645,15 @@ ${ravenolData.substring(0, 50000)}
       throw new Error('Все модели ИИ отключены администратором.');
     }
     
+    const aiTemperature = useAppStore.getState().aiTemperature ?? 0.4;
+    
     const response = await callGeminiWithRetry(ai, {
       model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
         responseSchema: carDataSchema,
-        temperature: 0.4,
+        temperature: aiTemperature,
         maxOutputTokens: 8192,
       }
     });
@@ -767,13 +769,15 @@ ${ravenolData.substring(0, 50000)}
       throw new Error('Все модели ИИ отключены администратором.');
     }
     
+    const aiTemperature = useAppStore.getState().aiTemperature ?? 0.4;
+    
     const response = await callGeminiWithRetry(ai, {
       model: models[0],
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
         responseSchema: carDataSchema,
-        temperature: 0.4,
+        temperature: aiTemperature,
         maxOutputTokens: 8192,
       }
     });

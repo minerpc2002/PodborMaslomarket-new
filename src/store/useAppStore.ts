@@ -17,6 +17,7 @@ interface AppState {
   isAiSearchEnabled: boolean;
   aiModelsConfig: AiModelConfig[];
   isSnowfallEnabled: boolean;
+  aiTemperature: number;
   activeSearches: BackgroundSearch[];
   notifications: Notification[];
   
@@ -34,6 +35,7 @@ interface AppState {
   setIsAiSearchEnabled: (enabled: boolean) => void;
   setAiModelsConfig: (config: AiModelConfig[]) => void;
   setIsSnowfallEnabled: (enabled: boolean) => void;
+  setAiTemperature: (temperature: number) => void;
   addActivatedPromoCode: (code: string) => void;
   
   addActiveSearch: (search: BackgroundSearch) => void;
@@ -67,6 +69,7 @@ export const useAppStore = create<AppState>()(
         { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 5 }
       ],
       isSnowfallEnabled: false,
+      aiTemperature: 0.4,
       activeSearches: [],
       notifications: [],
       
@@ -99,6 +102,10 @@ export const useAppStore = create<AppState>()(
       setIsAiSearchEnabled: (enabled) => set({ isAiSearchEnabled: enabled }),
       setAiModelsConfig: (config) => set({ aiModelsConfig: config }),
       setIsSnowfallEnabled: (enabled) => set({ isSnowfallEnabled: enabled }),
+      setAiTemperature: (temperature) => {
+        const val = typeof temperature === 'string' ? parseFloat(temperature) : temperature;
+        set({ aiTemperature: isNaN(val) ? 0.4 : val });
+      },
       addActivatedPromoCode: (code) => set((state) => ({
         userProfile: state.userProfile ? {
           ...state.userProfile,
@@ -173,7 +180,8 @@ export const useAppStore = create<AppState>()(
         searchTimestamps: state.searchTimestamps,
         activePromoCode: state.activePromoCode,
         aiModelsConfig: state.aiModelsConfig,
-        isSnowfallEnabled: state.isSnowfallEnabled
+        isSnowfallEnabled: state.isSnowfallEnabled,
+        aiTemperature: state.aiTemperature
       }),
     }
   )

@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -30,7 +30,7 @@ interface SupportChat {
 import { cn } from '../lib/utils';
 
 export default function Dashboard() {
-  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled } = useAppStore();
+  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled, aiTemperature, setAiTemperature } = useAppStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +58,7 @@ export default function Dashboard() {
   const [aiLoad, setAiLoad] = useState(0);
   const [aiUsage, setAiUsage] = useState<Record<string, any>>({});
   const [isResettingQuotas, setIsResettingQuotas] = useState(false);
+  const [showAdvancedAi, setShowAdvancedAi] = useState(false);
 
   // Support Chat State
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -67,8 +68,10 @@ export default function Dashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userProfile?.role === 'admin' || userProfile?.email?.toLowerCase() === 'minerpc2002@gmail.com';
-  const isStaff = isAdmin || userProfile?.role === 'moderator' || auth.currentUser?.email?.toLowerCase() === 'minerpc2002@gmail.com';
+  const isAdmin = userProfile?.role === 'admin' || 
+                 userProfile?.email?.toLowerCase() === 'minerpc2002@gmail.com' ||
+                 auth.currentUser?.email?.toLowerCase() === 'minerpc2002@gmail.com';
+  const isStaff = isAdmin || userProfile?.role === 'moderator';
 
   useEffect(() => {
     if (userProfile || auth.currentUser) {
@@ -105,6 +108,12 @@ export default function Dashboard() {
         const data = settingsDoc.data();
         setIsAiSearchEnabled(data.isAiSearchEnabled ?? true);
         setIsSnowfallEnabled(data.isSnowfallEnabled ?? false);
+        if (data.aiTemperature !== undefined) {
+          const temp = typeof data.aiTemperature === 'string' ? parseFloat(data.aiTemperature) : data.aiTemperature;
+          setAiTemperature(isNaN(temp) ? 0.4 : temp);
+        } else {
+          setAiTemperature(0.4);
+        }
         if (data.aiModelsConfig) {
           setAiModelsConfig(data.aiModelsConfig);
         }
@@ -114,6 +123,7 @@ export default function Dashboard() {
         await setDoc(doc(db, 'settings', 'ai_config'), {
           isAiSearchEnabled: true,
           isSnowfallEnabled: false,
+          aiTemperature: 0.4,
           aiModelsConfig: defaultConfig,
           updatedAt: Date.now(),
           updatedBy: userProfile?.uid || 'system'
@@ -230,7 +240,7 @@ export default function Dashboard() {
       await setDoc(doc(db, 'settings', 'ai_config'), {
         isSnowfallEnabled: newValue,
         updatedAt: Date.now(),
-        updatedBy: userProfile?.uid
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
       }, { merge: true });
       setIsSnowfallEnabled(newValue);
     } catch (err) {
@@ -323,7 +333,7 @@ export default function Dashboard() {
       await setDoc(doc(db, 'settings', 'ai_config'), {
         isAiSearchEnabled: newValue,
         updatedAt: Date.now(),
-        updatedBy: userProfile?.uid
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
       }, { merge: true });
       setIsAiSearchEnabled(newValue);
     } catch (err) {
@@ -344,7 +354,7 @@ export default function Dashboard() {
       await setDoc(doc(db, 'settings', 'ai_config'), {
         aiModelsConfig: updatedModels,
         updatedAt: Date.now(),
-        updatedBy: userProfile?.uid
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
       }, { merge: true });
       
       setAiModelsConfig(updatedModels);
@@ -379,7 +389,7 @@ export default function Dashboard() {
       await setDoc(doc(db, 'settings', 'ai_config'), {
         aiModelsConfig: newModels,
         updatedAt: Date.now(),
-        updatedBy: userProfile?.uid
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
       }, { merge: true });
       
       setAiModelsConfig(newModels);
@@ -390,9 +400,57 @@ export default function Dashboard() {
     }
   };
 
+  const handleAiTemperatureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAdmin) return;
+    const newTemp = parseFloat(e.target.value);
+    if (isNaN(newTemp)) return;
+    setAiTemperature(newTemp);
+    
+    // Debounce the save to Firestore
+    if ((window as any).tempSaveTimeout) {
+      clearTimeout((window as any).tempSaveTimeout);
+    }
+    
+    (window as any).tempSaveTimeout = setTimeout(async () => {
+      try {
+        await setDoc(doc(db, 'settings', 'ai_config'), {
+          aiTemperature: newTemp,
+          updatedAt: Date.now(),
+          updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
+        }, { merge: true });
+      } catch (err) {
+        console.error('Error saving AI temperature:', err);
+      }
+    }, 500);
+  };
+
+  const handleResetAiTemperature = async () => {
+    if (!isAdmin) return;
+    
+    setActionLoading('reset-ai-temp');
+    try {
+      const targetTemp = 0.4;
+      
+      // Update local state first for immediate UI feedback
+      setAiTemperature(targetTemp);
+      
+      // Then update Firestore
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        aiTemperature: targetTemp,
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
+      }, { merge: true });
+      
+    } catch (err) {
+      console.error('Error resetting AI temperature:', err);
+      // Revert if failed? No, usually better to keep what user intended
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleResetQuotas = async () => {
     if (!isAdmin) return;
-    if (!window.confirm('Вы уверены, что хотите сбросить все счетчики использования ИИ?')) return;
     
     setIsResettingQuotas(true);
     try {
@@ -1206,175 +1264,253 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="font-bold text-zinc-100 flex items-center gap-2 px-1">
-                      <Cpu size={18} className="text-purple-400" />
-                      Управление моделями Gemini
-                    </h3>
-                    <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
-                      <div className="p-4 border-b border-white/5 bg-zinc-900/50">
-                        <p className="text-sm text-zinc-400">
-                          Настройте порядок использования моделей. Верхняя модель будет использоваться первой. Если она недоступна (лимит или ошибка), запрос перейдет к следующей включенной модели.
-                        </p>
+                    <button
+                      onClick={() => setShowAdvancedAi(!showAdvancedAi)}
+                      className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-500/20 text-purple-400 rounded-lg">
+                          <Cpu size={20} />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="font-bold text-zinc-100">Расширенные настройки</h3>
+                          <p className="text-xs text-zinc-400">Управление моделями, квоты и креативность ИИ</p>
+                        </div>
                       </div>
-                      <div className="divide-y divide-white/5">
-                        {[...aiModelsConfig].sort((a, b) => a.priority - b.priority).map((model, index) => (
-                          <div key={model.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-white/5 transition-colors gap-3">
-                            <div className="flex items-center gap-3 sm:gap-4">
-                              <div className="flex flex-row sm:flex-col gap-2 sm:gap-1">
-                                <button 
-                                  onClick={() => handleMoveAiModel(model.id, 'up')}
-                                  disabled={index === 0 || actionLoading !== null}
-                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
-                                >
-                                  <ChevronUp size={16} className="sm:size-[16px] size-[20px]" />
-                                </button>
-                                <button 
-                                  onClick={() => handleMoveAiModel(model.id, 'down')}
-                                  disabled={index === aiModelsConfig.length - 1 || actionLoading !== null}
-                                  className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
-                                >
-                                  <ChevronDown size={16} className="sm:size-[16px] size-[20px]" />
-                                </button>
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="font-bold text-zinc-200 flex items-center gap-2 text-sm sm:text-base">
-                                  <span className="truncate">{model.name}</span>
-                                  {index === 0 && model.enabled && (
-                                    <span className="text-[9px] sm:text-[10px] bg-blue-500/20 text-blue-400 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-500/30 shrink-0">
-                                      Основная
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className="text-[10px] sm:text-xs text-zinc-500 font-mono mt-0.5 truncate">{model.id}</p>
-                              </div>
-                            </div>
-                            <Button
-                              variant={model.enabled ? 'default' : 'outline'}
-                              size="sm"
-                              className={cn(
-                                "w-full sm:w-auto h-9 sm:h-8 text-xs font-bold",
-                                model.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
-                              )}
-                              onClick={() => handleToggleAiModel(model.id)}
-                              disabled={actionLoading === `toggle-model-${model.id}`}
-                            >
-                              {actionLoading === `toggle-model-${model.id}` ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : model.enabled ? (
-                                <>
-                                  <Check size={14} className="mr-1.5" />
-                                  Включена
-                                </>
-                              ) : (
-                                <>
-                                  <XIcon size={14} className="mr-1.5" />
-                                  Отключена
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                      {showAdvancedAi ? <ChevronUp size={20} className="text-zinc-400" /> : <ChevronDown size={20} className="text-zinc-400" />}
+                    </button>
 
-                  <div className="space-y-4">
-                    <h3 className="font-bold text-zinc-100 flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                        <Sparkles size={18} className="text-amber-400" />
-                        Квоты и лимиты моделей
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={handleResetQuotas}
-                        disabled={isResettingQuotas}
-                        className="text-[10px] h-7 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
-                      >
-                        {isResettingQuotas ? <Loader2 size={12} className="animate-spin mr-1" /> : <Trash2 size={12} className="mr-1" />}
-                        Сбросить
-                      </Button>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[
-                        { 
-                          name: 'Gemini 3.1 Pro', 
-                          key: 'gemini_3_1_pro_preview_usage', 
-                          limit: 50, 
-                          color: 'purple',
-                          desc: 'Умная модель (Анализ)'
-                        },
-                        { 
-                          name: 'Gemini 3.1 Flash', 
-                          key: 'gemini_3_1_flash_preview_usage', 
-                          limit: 1500, 
-                          color: 'blue',
-                          desc: 'Основная модель (Быстрая)'
-                        },
-                        { 
-                          name: 'Gemini 3.1 Flash Lite', 
-                          key: 'gemini_3_1_flash_lite_preview_usage', 
-                          limit: 1500, 
-                          color: 'emerald',
-                          desc: 'Легкая модель'
-                        },
-                        { 
-                          name: 'Gemini 3.0 Flash', 
-                          key: 'gemini_3_flash_preview_usage', 
-                          limit: 1500, 
-                          color: 'cyan',
-                          desc: 'Базовая модель'
-                        },
-                        { 
-                          name: 'Gemini 2.5 Flash', 
-                          key: 'gemini_2_5_flash_usage', 
-                          limit: 1500, 
-                          color: 'amber',
-                          desc: 'Резервная модель'
-                        },
-                        { 
-                          name: 'OpenRouter Qwen', 
-                          key: 'openrouter_qwen_qwen3_6_plus_free_usage', 
-                          limit: 1000, 
-                          color: 'rose',
-                          desc: 'Внешняя модель (Qwen)'
-                        }
-                      ].map((model) => {
-                        const usage = aiUsage[model.key] || 0;
-                        const remaining = Math.max(0, model.limit - usage);
-                        const percent = Math.min(100, (usage / model.limit) * 100);
-                        
-                        return (
-                          <div key={model.name} className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-bold text-sm text-zinc-100">{model.name}</h4>
-                                <p className="text-[10px] text-zinc-500">{model.desc}</p>
+                    <AnimatePresence>
+                      {showAdvancedAi && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden space-y-6"
+                        >
+                          {/* AI Creativity Slider */}
+                          <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4 mt-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-zinc-100 flex items-center gap-2">
+                                  <Sparkles size={18} className="text-emerald-400" />
+                                  Креативность ИИ (Температура)
+                                </h3>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-[10px] text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 border border-white/5"
+                                  onClick={handleResetAiTemperature}
+                                  disabled={actionLoading === 'reset-ai-temp'}
+                                >
+                                  {actionLoading === 'reset-ai-temp' ? (
+                                    <Loader2 size={12} className="animate-spin mr-1" />
+                                  ) : (
+                                    <RotateCcw size={12} className="mr-1" />
+                                  )}
+                                  Сброс (0.4)
+                                </Button>
                               </div>
-                              <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold bg-${model.color}-500/20 text-${model.color}-400`}>
-                                {remaining} ост.
-                              </div>
+                              <span className="px-2 py-1 bg-zinc-800 rounded-lg text-xs font-mono text-zinc-300">
+                                {aiTemperature.toFixed(1)}
+                              </span>
                             </div>
-                            
-                            <div className="space-y-1.5">
-                              <div className="flex justify-between text-[10px]">
-                                <span className="text-zinc-500">Использовано: {usage}</span>
-                                <span className="text-zinc-400">{Math.round(percent)}%</span>
-                              </div>
-                              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full bg-${model.color}-500 transition-all duration-1000`}
-                                  style={{ width: `${percent}%` }}
-                                />
+                            <p className="text-xs text-zinc-400">
+                              Определяет степень креативности и вариативности ответов нейросети. 
+                              Меньшее значение (0.1) делает ответы более точными и сухими, большее (1.0+) — более разнообразными.
+                            </p>
+                            <div className="pt-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="2"
+                                step="0.1"
+                                value={aiTemperature}
+                                onChange={handleAiTemperatureChange}
+                                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                              />
+                              <div className="flex justify-between text-[10px] text-zinc-500 mt-2">
+                                <span>Точный (0.0)</span>
+                                <span>Сбалансированный (1.0)</span>
+                                <span>Креативный (2.0)</span>
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[10px] text-zinc-500 px-1 italic">
-                      * Квоты указаны ориентировочно для текущего расчетного периода. При достижении лимита модель может быть временно недоступна.
-                    </p>
+
+                          <div className="space-y-4">
+                            <h3 className="font-bold text-zinc-100 flex items-center gap-2 px-1">
+                              <Cpu size={18} className="text-purple-400" />
+                              Управление моделями Gemini
+                            </h3>
+                            <div className="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
+                              <div className="p-4 border-b border-white/5 bg-zinc-900/50">
+                                <p className="text-sm text-zinc-400">
+                                  Настройте порядок использования моделей. Верхняя модель будет использоваться первой. Если она недоступна (лимит или ошибка), запрос перейдет к следующей включенной модели.
+                                </p>
+                              </div>
+                              <div className="divide-y divide-white/5">
+                                {[...aiModelsConfig].sort((a, b) => a.priority - b.priority).map((model, index) => (
+                                  <div key={model.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-white/5 transition-colors gap-3">
+                                    <div className="flex items-center gap-3 sm:gap-4">
+                                      <div className="flex flex-row sm:flex-col gap-2 sm:gap-1">
+                                        <button 
+                                          onClick={() => handleMoveAiModel(model.id, 'up')}
+                                          disabled={index === 0 || actionLoading !== null}
+                                          className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
+                                        >
+                                          <ChevronUp size={16} className="sm:size-[16px] size-[20px]" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleMoveAiModel(model.id, 'down')}
+                                          disabled={index === aiModelsConfig.length - 1 || actionLoading !== null}
+                                          className="text-zinc-500 hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
+                                        >
+                                          <ChevronDown size={16} className="sm:size-[16px] size-[20px]" />
+                                        </button>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h4 className="font-bold text-zinc-200 flex items-center gap-2 text-sm sm:text-base">
+                                          <span className="truncate">{model.name}</span>
+                                          {index === 0 && model.enabled && (
+                                            <span className="text-[9px] sm:text-[10px] bg-blue-500/20 text-blue-400 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-500/30 shrink-0">
+                                              Основная
+                                            </span>
+                                          )}
+                                        </h4>
+                                        <p className="text-[10px] sm:text-xs text-zinc-500 font-mono mt-0.5 truncate">{model.id}</p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant={model.enabled ? 'default' : 'outline'}
+                                      size="sm"
+                                      className={cn(
+                                        "w-full sm:w-auto h-9 sm:h-8 text-xs font-bold",
+                                        model.enabled ? 'bg-emerald-600 hover:bg-emerald-700' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'
+                                      )}
+                                      onClick={() => handleToggleAiModel(model.id)}
+                                      disabled={actionLoading === `toggle-model-${model.id}`}
+                                    >
+                                      {actionLoading === `toggle-model-${model.id}` ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                      ) : model.enabled ? (
+                                        <>
+                                          <Check size={14} className="mr-1.5" />
+                                          Включена
+                                        </>
+                                      ) : (
+                                        <>
+                                          <XIcon size={14} className="mr-1.5" />
+                                          Отключена
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h3 className="font-bold text-zinc-100 flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                <Sparkles size={18} className="text-amber-400" />
+                                Суточные квоты и лимиты моделей
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={handleResetQuotas}
+                                disabled={isResettingQuotas}
+                                className="text-[10px] h-7 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                              >
+                                {isResettingQuotas ? <Loader2 size={12} className="animate-spin mr-1" /> : <Trash2 size={12} className="mr-1" />}
+                                Сбросить
+                              </Button>
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {[
+                                { 
+                                  name: 'Gemini 3.1 Pro', 
+                                  key: 'gemini_3_1_pro_preview_usage', 
+                                  limit: 50, 
+                                  color: 'purple',
+                                  desc: 'Умная модель (Анализ)'
+                                },
+                                { 
+                                  name: 'Gemini 3.1 Flash', 
+                                  key: 'gemini_3_1_flash_preview_usage', 
+                                  limit: 1500, 
+                                  color: 'blue',
+                                  desc: 'Основная модель (Быстрая)'
+                                },
+                                { 
+                                  name: 'Gemini 3.1 Flash Lite', 
+                                  key: 'gemini_3_1_flash_lite_preview_usage', 
+                                  limit: 1500, 
+                                  color: 'emerald',
+                                  desc: 'Легкая модель'
+                                },
+                                { 
+                                  name: 'Gemini 3.0 Flash', 
+                                  key: 'gemini_3_flash_preview_usage', 
+                                  limit: 1500, 
+                                  color: 'cyan',
+                                  desc: 'Базовая модель'
+                                },
+                                { 
+                                  name: 'Gemini 2.5 Flash', 
+                                  key: 'gemini_2_5_flash_usage', 
+                                  limit: 1500, 
+                                  color: 'amber',
+                                  desc: 'Резервная модель'
+                                },
+                                { 
+                                  name: 'OpenRouter Qwen', 
+                                  key: 'openrouter_qwen_qwen3_6_plus_free_usage', 
+                                  limit: 1000, 
+                                  color: 'rose',
+                                  desc: 'Внешняя модель (Qwen)'
+                                }
+                              ].map((model) => {
+                                const usage = aiUsage[model.key] || 0;
+                                const remaining = Math.max(0, model.limit - usage);
+                                const percent = Math.min(100, (usage / model.limit) * 100);
+                                
+                                return (
+                                  <div key={model.name} className="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <h4 className="font-bold text-sm text-zinc-100">{model.name}</h4>
+                                        <p className="text-[10px] text-zinc-500">{model.desc}</p>
+                                      </div>
+                                      <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold bg-${model.color}-500/20 text-${model.color}-400`}>
+                                        {remaining} ост.
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1.5">
+                                      <div className="flex justify-between text-[10px]">
+                                        <span className="text-zinc-500">Использовано: {usage}</span>
+                                        <span className="text-zinc-400">{Math.round(percent)}%</span>
+                                      </div>
+                                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                        <div 
+                                          className={`h-full rounded-full bg-${model.color}-500 transition-all duration-1000`}
+                                          style={{ width: `${percent}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <p className="text-[10px] text-zinc-500 px-1 italic">
+                              * Суточные квоты указаны ориентировочно для текущего расчетного периода. При достижении лимита модель может быть временно недоступна.
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </CardContent>
               </Card>
