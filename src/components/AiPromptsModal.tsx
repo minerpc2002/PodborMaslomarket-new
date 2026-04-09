@@ -89,7 +89,16 @@ export default function AiPromptsModal({ isOpen, onClose, isAdmin }: AiPromptsMo
     setAssistantResult(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      let apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+        apiKey = process.env.GEMINI_API_KEY;
+      }
+
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey === 'undefined' || apiKey === 'null') {
+        throw new Error('GEMINI_API_KEY не настроен. Пожалуйста, добавьте VITE_GEMINI_API_KEY в переменные окружения (Environment Variables) на Vercel и перезапустите Deployment.');
+      }
+      
+      const ai = new GoogleGenAI({ apiKey });
       const currentPrompt = editingPrompts[activeTab];
       
       const systemInstruction = `You are an expert in prompt engineering for automotive oil selection systems. 
