@@ -94,3 +94,10 @@ export interface AiModelConfig {
   enabled: boolean;
   priority: number;
 }
+
+export interface AiPromptsConfig {
+  vinNoData: string;
+  vinWithData: string;
+  manualNoData: string;
+  manualWithData: string;
+}

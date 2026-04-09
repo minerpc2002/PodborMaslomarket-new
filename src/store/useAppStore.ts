@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CarData, UserProfile, PromoCode, AiModelConfig, Notification, BackgroundSearch } from '../types';
+import { CarData, UserProfile, PromoCode, AiModelConfig, Notification, BackgroundSearch, AiPromptsConfig } from '../types';
+import { defaultPrompts } from '../lib/defaultPrompts';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -18,6 +19,7 @@ interface AppState {
   aiModelsConfig: AiModelConfig[];
   isSnowfallEnabled: boolean;
   aiTemperature: number;
+  aiPrompts: AiPromptsConfig;
   activeSearches: BackgroundSearch[];
   notifications: Notification[];
   
@@ -36,6 +38,7 @@ interface AppState {
   setAiModelsConfig: (config: AiModelConfig[]) => void;
   setIsSnowfallEnabled: (enabled: boolean) => void;
   setAiTemperature: (temperature: number) => void;
+  setAiPrompts: (prompts: AiPromptsConfig) => void;
   addActivatedPromoCode: (code: string) => void;
   
   addActiveSearch: (search: BackgroundSearch) => void;
@@ -70,6 +73,7 @@ export const useAppStore = create<AppState>()(
       ],
       isSnowfallEnabled: false,
       aiTemperature: 0.4,
+      aiPrompts: defaultPrompts,
       activeSearches: [],
       notifications: [],
       
@@ -106,6 +110,7 @@ export const useAppStore = create<AppState>()(
         const val = typeof temperature === 'string' ? parseFloat(temperature) : temperature;
         set({ aiTemperature: isNaN(val) ? 0.4 : val });
       },
+      setAiPrompts: (prompts) => set({ aiPrompts: prompts }),
       addActivatedPromoCode: (code) => set((state) => ({
         userProfile: state.userProfile ? {
           ...state.userProfile,
@@ -181,7 +186,8 @@ export const useAppStore = create<AppState>()(
         activePromoCode: state.activePromoCode,
         aiModelsConfig: state.aiModelsConfig,
         isSnowfallEnabled: state.isSnowfallEnabled,
-        aiTemperature: state.aiTemperature
+        aiTemperature: state.aiTemperature,
+        aiPrompts: state.aiPrompts
       }),
     }
   )

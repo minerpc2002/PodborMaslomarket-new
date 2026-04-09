@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -27,14 +27,124 @@ interface SupportChat {
   lastMessageAt?: number;
 }
 
+import { GoogleGenAI } from "@google/genai";
 import { cn } from '../lib/utils';
 
+import { defaultPrompts } from '../lib/defaultPrompts';
+
 export default function Dashboard() {
-  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled, aiTemperature, setAiTemperature } = useAppStore();
+  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled, aiTemperature, setAiTemperature, aiPrompts, setAiPrompts } = useAppStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // AI Prompts State
+  const [editingPrompts, setEditingPrompts] = useState(aiPrompts);
+  const [isPromptsChanged, setIsPromptsChanged] = useState(false);
+  const [activePromptTab, setActivePromptTab] = useState<'vinNoData' | 'vinWithData' | 'manualNoData' | 'manualWithData'>('vinNoData');
+
+  // Assistant State
+  const [assistantRequest, setAssistantRequest] = useState('');
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantResult, setAssistantResult] = useState<string | null>(null);
+  const [assistantError, setAssistantError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditingPrompts(aiPrompts);
+    setIsPromptsChanged(false);
+  }, [aiPrompts]);
+
+  const handlePromptChange = (key: 'vinNoData' | 'vinWithData' | 'manualNoData' | 'manualWithData', value: string) => {
+    setEditingPrompts(prev => ({ ...prev, [key]: value }));
+    setIsPromptsChanged(true);
+  };
+
+  const handleSavePrompts = async () => {
+    if (!userProfile?.role || userProfile.role !== 'admin') return;
+    setActionLoading('save-prompts');
+    try {
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        aiPrompts: editingPrompts,
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser?.uid || 'admin'
+      }, { merge: true });
+      setAiPrompts(editingPrompts);
+      setIsPromptsChanged(false);
+    } catch (err) {
+      console.error('Error saving AI prompts:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResetPrompts = async () => {
+    if (!userProfile?.role || userProfile.role !== 'admin') return;
+    setActionLoading('reset-prompts');
+    try {
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        aiPrompts: defaultPrompts,
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser?.uid || 'admin'
+      }, { merge: true });
+      setAiPrompts(defaultPrompts);
+      setEditingPrompts(defaultPrompts);
+      setIsPromptsChanged(false);
+    } catch (err) {
+      console.error('Error resetting AI prompts:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAssistantSubmit = async () => {
+    if (!assistantRequest.trim()) return;
+    setAssistantLoading(true);
+    setAssistantError(null);
+    setAssistantResult(null);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const currentPrompt = editingPrompts[activePromptTab];
+      
+      const systemInstruction = `You are an expert in prompt engineering for automotive oil selection systems. 
+Your task is to modify the provided system prompt based on the user's request in Russian.
+The system prompt is in English and uses placeholders like {{VIN}}, {{RAVENOL_DATA}}, {{MILEAGE}}, {{CONDITIONS}}, {{POWER}}, {{HAND_DRIVE}}, {{FUEL_TYPE}}, {{VEHICLE_HINT}}, {{VEHICLE_HINT_SECTION}}, {{QUERY}}, {{CAR_DETAILS}}.
+You MUST preserve these placeholders exactly as they are.
+The output should be the full updated prompt in English. 
+Be precise and technical. 
+Return ONLY the updated prompt text, no explanations.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Current Prompt:\n${currentPrompt}\n\nUser Request (Russian):\n${assistantRequest}`,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+        },
+      });
+
+      const result = response.text;
+      if (result) {
+        setAssistantResult(result);
+      } else {
+        throw new Error('Не удалось получить ответ от ИИ');
+      }
+    } catch (err: any) {
+      console.error('Assistant error:', err);
+      setAssistantError(err.message || 'Произошла ошибка при работе помощника');
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
+  const applyAssistantResult = () => {
+    if (assistantResult) {
+      handlePromptChange(activePromptTab, assistantResult);
+      setAssistantResult(null);
+      setAssistantRequest('');
+    }
+  };
 
   // Support Ban State
   const [banUserId, setBanUserId] = useState<string | null>(null);
@@ -117,14 +227,19 @@ export default function Dashboard() {
         if (data.aiModelsConfig) {
           setAiModelsConfig(data.aiModelsConfig);
         }
+        if (data.aiPrompts) {
+          useAppStore.getState().setAiPrompts(data.aiPrompts);
+        }
       } else {
         // Create default settings if not exists
         const defaultConfig = useAppStore.getState().aiModelsConfig;
+        const defaultPromptsConfig = useAppStore.getState().aiPrompts;
         await setDoc(doc(db, 'settings', 'ai_config'), {
           isAiSearchEnabled: true,
           isSnowfallEnabled: false,
           aiTemperature: 0.4,
           aiModelsConfig: defaultConfig,
+          aiPrompts: defaultPromptsConfig,
           updatedAt: Date.now(),
           updatedBy: userProfile?.uid || 'system'
         });
@@ -679,10 +794,16 @@ export default function Dashboard() {
                 )}
               </TabsTrigger>
               {isAdmin && (
-                <TabsTrigger value="ai_settings" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
-                  <Cpu size={18} />
-                  <span>Настройки ИИ</span>
-                </TabsTrigger>
+                <>
+                  <TabsTrigger value="ai_settings" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+                    <Cpu size={18} />
+                    <span>Настройки ИИ</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="ai_prompts" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+                    <MessageSquare size={18} />
+                    <span>Промпты</span>
+                  </TabsTrigger>
+                </>
               )}
             </>
           )}
@@ -1311,9 +1432,11 @@ export default function Dashboard() {
                                   Сброс (0.4)
                                 </Button>
                               </div>
-                              <span className="px-2 py-1 bg-zinc-800 rounded-lg text-xs font-mono text-zinc-300">
-                                {aiTemperature.toFixed(1)}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 bg-zinc-800 rounded-lg text-xs font-mono text-zinc-300">
+                                  {aiTemperature.toFixed(1)}
+                                </span>
+                              </div>
                             </div>
                             <p className="text-xs text-zinc-400">
                               Определяет степень креативности и вариативности ответов нейросети. 
@@ -1511,6 +1634,187 @@ export default function Dashboard() {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="ai_prompts" className="space-y-6">
+              <Card className="liquid-glass border-none">
+                <CardHeader>
+                  <CardTitle>Системные промпты</CardTitle>
+                  <CardDescription>Настройка логики ответов нейросети</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Tabs */}
+                  <div className="flex flex-wrap gap-2 p-1 bg-black/20 rounded-2xl border border-white/5">
+                    {[
+                      { key: 'vinNoData', label: 'VIN (без каталога)' },
+                      { key: 'vinWithData', label: 'VIN (с каталогом)' },
+                      { key: 'manualNoData', label: 'Ручной (без каталога)' },
+                      { key: 'manualWithData', label: 'Ручной (с каталогом)' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActivePromptTab(tab.key as any)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                          activePromptTab === tab.key 
+                            ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" 
+                            : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Editor Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Редактор промпта</h3>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "w-2 h-2 rounded-full",
+                            isPromptsChanged ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                          )} />
+                          <span className="text-[10px] text-zinc-500 uppercase font-bold">
+                            {isPromptsChanged ? 'Есть изменения' : 'Сохранено'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <textarea
+                        value={editingPrompts[activePromptTab]}
+                        onChange={(e) => handlePromptChange(activePromptTab as any, e.target.value)}
+                        className="w-full h-[400px] bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-zinc-300 font-mono focus:outline-none focus:border-blue-500/50 resize-none transition-all custom-scrollbar"
+                        placeholder="Введите текст промпта..."
+                      />
+
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleSavePrompts}
+                          disabled={!isPromptsChanged || actionLoading !== null}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-11 rounded-xl shadow-lg shadow-emerald-900/20"
+                        >
+                          {actionLoading === 'save-prompts' ? (
+                            <Loader2 size={18} className="animate-spin mr-2" />
+                          ) : (
+                            <Check size={18} className="mr-2" />
+                          )}
+                          Сохранить изменения
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleResetPrompts}
+                          disabled={actionLoading !== null}
+                          className="flex-1 border-white/10 hover:bg-white/5 h-11 rounded-xl text-zinc-400"
+                        >
+                          {actionLoading === 'reset-prompts' ? (
+                            <Loader2 size={18} className="animate-spin mr-2" />
+                          ) : (
+                            <RotateCcw size={18} className="mr-2" />
+                          )}
+                          Сбросить
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Assistant Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 px-1">
+                        <Sparkles size={18} className="text-purple-400" />
+                        <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">ИИ-Помощник</h3>
+                      </div>
+
+                      <div className="bg-purple-500/5 border border-purple-500/10 rounded-2xl p-6 space-y-6">
+                        <div className="space-y-2">
+                          <p className="text-sm text-zinc-300">
+                            Опишите, что вы хотите изменить или добавить в промпт. ИИ сам составит правильные инструкции на английском.
+                          </p>
+                          <p className="text-[10px] text-zinc-500 italic">
+                            Пример: "Добавь более строгие правила для поиска антифриза, чтобы он всегда указывал цвет и стандарт G11/G12"
+                          </p>
+                        </div>
+
+                        <div className="relative">
+                          <textarea
+                            value={assistantRequest}
+                            onChange={(e) => setAssistantRequest(e.target.value)}
+                            placeholder="Что нужно изменить?..."
+                            className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/50 resize-none transition-all"
+                          />
+                          <Button
+                            onClick={handleAssistantSubmit}
+                            disabled={assistantLoading || !assistantRequest.trim()}
+                            className="absolute bottom-3 right-3 bg-purple-600 hover:bg-purple-700 text-white h-9 px-4 rounded-lg shadow-lg shadow-purple-900/20"
+                          >
+                            {assistantLoading ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <>
+                                <Wand2 size={16} className="mr-2" />
+                                Сгенерировать
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        <AnimatePresence mode="wait">
+                          {assistantError && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3"
+                            >
+                              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                              <p className="text-xs text-red-400">{assistantError}</p>
+                            </motion.div>
+                          )}
+
+                          {assistantResult && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="space-y-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Результат генерации</span>
+                                <span className="text-[10px] text-zinc-500">Проверьте placeholders перед внедрением</span>
+                              </div>
+                              <div className="bg-black/60 border border-purple-500/20 rounded-xl p-4 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                <pre className="text-[10px] text-zinc-400 font-mono whitespace-pre-wrap leading-relaxed">
+                                  {assistantResult}
+                                </pre>
+                              </div>
+                              <Button
+                                onClick={applyAssistantResult}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white h-10 rounded-xl"
+                              >
+                                <Check size={18} className="mr-2" />
+                                Внедрить в редактор
+                              </Button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+                        <h4 className="text-xs font-bold text-blue-400 mb-2 flex items-center gap-2">
+                          <AlertCircle size={14} /> Доступные переменные:
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['{{VIN}}', '{{RAVENOL_DATA}}', '{{MILEAGE}}', '{{QUERY}}', '{{CAR_DETAILS}}'].map(v => (
+                            <code key={v} className="px-1.5 py-0.5 bg-blue-500/10 text-blue-300 rounded text-[10px] font-mono">
+                              {v}
+                            </code>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
