@@ -74,6 +74,19 @@ export default function AuthModal() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
+
+    if (isTelegramWebApp()) {
+      setError('Вход через Google недоступен внутри Telegram (ограничение безопасности Google). Пожалуйста, используйте «Войти через Email» или откройте приложение в обычном браузере.');
+      // Optional: attempt to open in external browser
+      try {
+        if (window.Telegram?.WebApp?.openLink) {
+          // window.Telegram.WebApp.openLink(window.location.href);
+        }
+      } catch (e) {}
+      setLoading(false);
+      return;
+    }
+
     try {
       const provider = new GoogleAuthProvider();
       
@@ -265,15 +278,41 @@ export default function AuthModal() {
             <div className="space-y-4">
               {authMode === 'social' ? (
                 <div className="grid grid-cols-1 gap-3">
-                  <Button 
-                    onClick={handleGoogleLogin} 
-                    disabled={loading}
-                    className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
-                    size="lg"
-                  >
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-                    Войти через Google
-                  </Button>
+                  {isTelegramWebApp() ? (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-center space-y-3">
+                        <p className="text-xs text-orange-400 leading-relaxed font-medium">
+                          Из-за ограничений безопасности Telegram, вход через Google недоступен внутри мессенджера.
+                        </p>
+                        <Button 
+                          onClick={() => {
+                            try {
+                              if (window.Telegram?.WebApp?.openLink) {
+                                window.Telegram.WebApp.openLink(window.location.href);
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                          className="w-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center gap-2"
+                          size="sm"
+                        >
+                          <LogIn size={16} />
+                          Открыть в браузере (Chrome/Safari)
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={handleGoogleLogin} 
+                      disabled={loading}
+                      className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
+                      size="lg"
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                      Войти через Google
+                    </Button>
+                  )}
 
                   <div className="relative my-2">
                     <div className="absolute inset-0 flex items-center">
