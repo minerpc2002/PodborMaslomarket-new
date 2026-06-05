@@ -58,13 +58,14 @@ export default function AuthModal() {
 
     // Check for redirect result on mount (only if we actually initiated a redirect flow)
     const checkRedirect = async () => {
-      const wasRedirecting = sessionStorage.getItem('googleAuthRedirectStarted') === 'true';
+      const wasRedirecting = sessionStorage.getItem('googleAuthRedirectStarted') === 'true' || localStorage.getItem('googleAuthRedirectStarted') === 'true';
       if (!wasRedirecting) {
         return; // Skip completely to prevent unwanted iframe background-sync errors on normal page loads
       }
 
       try {
         sessionStorage.removeItem('googleAuthRedirectStarted');
+        localStorage.removeItem('googleAuthRedirectStarted');
         const result = await getRedirectResult(auth);
         
         if (result?.user) {
@@ -98,10 +99,20 @@ export default function AuthModal() {
     setLoading(true);
     setError('');
 
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const insideTelegram = isTelegramWebApp();
+
     try {
       const provider = new GoogleAuthProvider();
       // Force users to select account interactively, avoiding sticky/automatic background login issues
       provider.setCustomParameters({ prompt: 'select_account' });
+      
+      if (insideTelegram || isMobile) {
+        sessionStorage.setItem('googleAuthRedirectStarted', 'true');
+        localStorage.setItem('googleAuthRedirectStarted', 'true');
+        await signInWithRedirect(auth, provider);
+        return; // Execution stops here as page redirects
+      }
       
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
@@ -112,7 +123,7 @@ export default function AuthModal() {
         setCurrentUser(user);
       }
     } catch (popupErr: any) {
-      console.error('Google popup error:', popupErr);
+      console.error('Google login error:', popupErr);
       if (popupErr.code === 'auth/popup-closed-by-user') {
         setLoading(false);
         return;
