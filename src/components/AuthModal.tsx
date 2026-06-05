@@ -70,6 +70,8 @@ export default function AuthModal() {
         sessionStorage.removeItem('googleAuthRedirectStarted');
         if (err.code === 'auth/unauthorized-domain') {
           setError('Этот домен не добавлен в список разрешенных в консоли Firebase.');
+        } else if (err.code === 'auth/network-request-failed') {
+          setError('Ошибка сети или ограничения браузера (блокировка сторонних куки). Авторизация через Google прервана. В Telegram или Safari, пожалуйста, используйте «Вход по Email».');
         } else {
           setError('Ошибка при входе через Google (Redirect). Откройте сайт в обычном браузере.');
         }
@@ -85,16 +87,15 @@ export default function AuthModal() {
     setLoading(true);
     setError('');
 
+    if (isTelegramWebApp()) {
+      setError('Ограничение Telegram: встроенный браузер блокирует авторизацию Google (появляется белый экран). Пожалуйста, используйте «Вход по Email» или откройте сайт в обычном браузере (Chrome/Safari).');
+      setLoading(false);
+      return;
+    }
+
     try {
       const provider = new GoogleAuthProvider();
       
-      // If inside Telegram Web App, or forcing mobile redirect, popup will break (white screen)
-      if (isTelegramWebApp() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        sessionStorage.setItem('googleAuthRedirectStarted', 'true');
-        await signInWithRedirect(auth, provider);
-        return; // Execution stops here as the page redirects
-      }
-
       try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -119,11 +120,19 @@ export default function AuthModal() {
           throw new Error('Браузер заблокировал всплывающее окно. Пожалуйста, разрешите всплывающие окна для этого сайта.');
         }
 
+        if (popupErr.code === 'auth/network-request-failed') {
+          throw new Error('Ошибка сети или ограничения браузера (например, в Telegram). Авторизация через Google прервана. Пожалуйста, используйте «Вход по Email».');
+        }
+
         throw new Error(popupErr.message || 'Вход через Google не удался. Ограничения браузера или встроенного окна.');
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Ошибка при входе через Google');
+      if (err.code === 'auth/network-request-failed') {
+          setError('Ошибка сети: Вход через Google заблокирован в этом браузере или приложении (Telegram). Пожалуйста, используйте «Вход по Email» или откройте сайт в Chrome/Safari напрямую.');
+      } else {
+          setError(err.message || 'Ошибка при входе через Google');
+      }
       setLoading(false);
     }
   };
