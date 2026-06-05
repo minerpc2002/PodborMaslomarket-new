@@ -98,12 +98,6 @@ export default function AuthModal() {
     setLoading(true);
     setError('');
 
-    if (isTelegramWebApp()) {
-      setError('Ограничение Telegram: встроенный браузер блокирует авторизацию Google (появляется белый экран). Пожалуйста, используйте «Вход по Email» или откройте сайт в обычном браузере (Chrome/Safari).');
-      setLoading(false);
-      return;
-    }
-
     try {
       const provider = new GoogleAuthProvider();
       // Force users to select account interactively, avoiding sticky/automatic background login issues
@@ -124,14 +118,16 @@ export default function AuthModal() {
         return;
       }
       
-      if (popupErr.code === 'auth/unauthorized-domain') {
+      if (isTelegramWebApp()) {
+        setError('Не удалось выполнить вход через Google во встроенном браузере Telegram. Пожалуйста, воспользуйтесь «Входом по Email» или откройте сайт в обычном мобильном браузере (через Safari/Chrome).');
+      } else if (popupErr.code === 'auth/unauthorized-domain') {
         setError('Этот домен не авторизован в консоли Firebase. Пожалуйста, воспользуйтесь входом по Email.');
       } else if (popupErr.code === 'auth/popup-blocked') {
         setError('Браузер заблокировал всплывающее окно. Пожалуйста, разрешите всплывающие окна для этого сайта в настройках браузера.');
       } else if (popupErr.code === 'auth/network-request-failed') {
-        setError('Ошибка сети (или блокировка сторонних файлов cookies браузером). Если вы открыли сайт внутри AI Studio, обязательно откройте его в новой вкладке в правом верхнем углу (иконка Open), либо используйте Вход через Email.');
+        setError('Ошибка сети (или блокировка сторонних файлов cookies браузером). Пожалуйста, воспользуйтесь «Входом по Email» или откройте сайт в обычном браузере.');
       } else {
-        setError(popupErr.message || 'Вход через Google не удался из-за ограничений браузера. Пожалуйста, воспользуйтесь входом по Email.');
+        setError(popupErr.message || 'Вход через Google не удался. Пожалуйста, воспользуйтесь входом по Email.');
       }
     } finally {
       setLoading(false);
@@ -311,6 +307,17 @@ export default function AuthModal() {
                           откройте сайт в новой вкладке <ExternalLink size={10} />
                         </a>{' '}
                         для входа через Google, либо войдите через <strong>Email</strong>.
+                      </p>
+                    </div>
+                  )}
+                  {isTelegramWebApp() && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-1.5 mb-1 select-none hover:border-blue-500/30 transition-colors">
+                      <div className="flex items-center gap-1.5 text-blue-400 text-xs font-semibold">
+                        <AlertTriangle size={15} />
+                        <span>Режим Telegram</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 leading-relaxed text-left">
+                        Встроенный браузер Telegram иногда блокирует авторизацию Google. Если кнопка не сработает, войдите через <strong>Email</strong> или откройте приложение в обычном браузере (нажав три точки в правом верхнем углу).
                       </p>
                     </div>
                   )}
