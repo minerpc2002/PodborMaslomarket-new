@@ -48,20 +48,30 @@ export default function AuthModal() {
     // Check for redirect result on mount
     const checkRedirect = async () => {
       try {
+        const wasRedirecting = sessionStorage.getItem('googleAuthRedirectStarted') === 'true';
+        if (wasRedirecting) {
+          sessionStorage.removeItem('googleAuthRedirectStarted');
+        }
+
         const result = await getRedirectResult(auth);
+        
         if (result?.user) {
           const userDoc = await getDoc(doc(db, 'users', result.user.uid));
           if (!userDoc.exists()) {
             setNeedsNickname(true);
             setCurrentUser(result.user);
           }
+        } else if (wasRedirecting && !auth.currentUser) {
+          // If we were redirecting but got no result and no user, the cookies were blocked
+          setError('Авторизация прервана из-за ограничений безопасности браузера (блокировка сторонних куки). В Telegram (или на iOS) используйте «Войти по Email» или нажмите три точки в углу и выберите «Открыть в браузере» (Safari/Chrome).');
         }
       } catch (err: any) {
         console.error('Redirect result error:', err);
+        sessionStorage.removeItem('googleAuthRedirectStarted');
         if (err.code === 'auth/unauthorized-domain') {
           setError('Этот домен не добавлен в список разрешенных в консоли Firebase.');
         } else {
-          setError('Ошибка при входе через Google (Redirect)');
+          setError('Ошибка при входе через Google (Redirect). Откройте сайт в обычном браузере.');
         }
       }
     };
@@ -78,6 +88,13 @@ export default function AuthModal() {
     try {
       const provider = new GoogleAuthProvider();
       
+      // If inside Telegram Web App, or forcing mobile redirect, popup will break (white screen)
+      if (isTelegramWebApp() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        sessionStorage.setItem('googleAuthRedirectStarted', 'true');
+        await signInWithRedirect(auth, provider);
+        return; // Execution stops here as the page redirects
+      }
+
       try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
