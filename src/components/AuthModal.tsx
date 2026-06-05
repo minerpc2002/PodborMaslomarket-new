@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { ShieldCheck, User, LogIn, Loader2, Mail, Lock, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, User, LogIn, Loader2, Mail, Lock, UserPlus, Eye, EyeOff, AlertTriangle, ExternalLink } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { 
   GoogleAuthProvider, 
@@ -33,9 +33,20 @@ export default function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isInIframe, setIsInIframe] = useState(false);
 
   const error = localError || authError;
   const setError = setLocalError;
+
+  useEffect(() => {
+    try {
+      if (window.self !== window.top) {
+        setIsInIframe(true);
+      }
+    } catch (e) {
+      setIsInIframe(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (isAuthReady && auth.currentUser && !userProfile) {
@@ -45,14 +56,15 @@ export default function AuthModal() {
       setNeedsNickname(false);
     }
 
-    // Check for redirect result on mount
+    // Check for redirect result on mount (only if we actually initiated a redirect flow)
     const checkRedirect = async () => {
-      try {
-        const wasRedirecting = sessionStorage.getItem('googleAuthRedirectStarted') === 'true';
-        if (wasRedirecting) {
-          sessionStorage.removeItem('googleAuthRedirectStarted');
-        }
+      const wasRedirecting = sessionStorage.getItem('googleAuthRedirectStarted') === 'true';
+      if (!wasRedirecting) {
+        return; // Skip completely to prevent unwanted iframe background-sync errors on normal page loads
+      }
 
+      try {
+        sessionStorage.removeItem('googleAuthRedirectStarted');
         const result = await getRedirectResult(auth);
         
         if (result?.user) {
@@ -61,13 +73,12 @@ export default function AuthModal() {
             setNeedsNickname(true);
             setCurrentUser(result.user);
           }
-        } else if (wasRedirecting && !auth.currentUser) {
+        } else if (!auth.currentUser) {
           // If we were redirecting but got no result and no user, the cookies were blocked
           setError('Авторизация прервана из-за ограничений безопасности браузера (блокировка сторонних куки). В Telegram (или на iOS) используйте «Войти по Email» или нажмите три точки в углу и выберите «Открыть в браузере» (Safari/Chrome).');
         }
       } catch (err: any) {
         console.error('Redirect result error:', err);
-        sessionStorage.removeItem('googleAuthRedirectStarted');
         if (err.code === 'auth/unauthorized-domain') {
           setError('Этот домен не добавлен в список разрешенных в консоли Firebase.');
         } else if (err.code === 'auth/network-request-failed') {
@@ -95,44 +106,34 @@ export default function AuthModal() {
 
     try {
       const provider = new GoogleAuthProvider();
+      // Force users to select account interactively, avoiding sticky/automatic background login issues
+      provider.setCustomParameters({ prompt: 'select_account' });
       
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (!userDoc.exists()) {
-          setNeedsNickname(true);
-          setCurrentUser(user);
-        }
-      } catch (popupErr: any) {
-        console.error('Google popup error:', popupErr);
-        if (popupErr.code === 'auth/popup-closed-by-user') {
-          setLoading(false);
-          return;
-        }
-        
-        if (popupErr.code === 'auth/unauthorized-domain') {
-          throw new Error('Домен не авторизован в Firebase Console. Добавьте ваш Vercel домен в Authorized Domains.');
-        }
-        
-        if (popupErr.code === 'auth/popup-blocked') {
-          throw new Error('Браузер заблокировал всплывающее окно. Пожалуйста, разрешите всплывающие окна для этого сайта.');
-        }
-
-        if (popupErr.code === 'auth/network-request-failed') {
-          throw new Error('Ошибка сети или ограничения браузера (например, в Telegram). Авторизация через Google прервана. Пожалуйста, используйте «Вход по Email».');
-        }
-
-        throw new Error(popupErr.message || 'Вход через Google не удался. Ограничения браузера или встроенного окна.');
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        setNeedsNickname(true);
+        setCurrentUser(user);
       }
-    } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/network-request-failed') {
-          setError('Ошибка сети: Вход через Google заблокирован в этом браузере или приложении (Telegram). Пожалуйста, используйте «Вход по Email» или откройте сайт в Chrome/Safari напрямую.');
+    } catch (popupErr: any) {
+      console.error('Google popup error:', popupErr);
+      if (popupErr.code === 'auth/popup-closed-by-user') {
+        setLoading(false);
+        return;
+      }
+      
+      if (popupErr.code === 'auth/unauthorized-domain') {
+        setError('Этот домен не авторизован в консоли Firebase. Пожалуйста, воспользуйтесь входом по Email.');
+      } else if (popupErr.code === 'auth/popup-blocked') {
+        setError('Браузер заблокировал всплывающее окно. Пожалуйста, разрешите всплывающие окна для этого сайта в настройках браузера.');
+      } else if (popupErr.code === 'auth/network-request-failed') {
+        setError('Ошибка сети (или блокировка сторонних файлов cookies браузером). Если вы открыли сайт внутри AI Studio, обязательно откройте его в новой вкладке в правом верхнем углу (иконка Open), либо используйте Вход через Email.');
       } else {
-          setError(err.message || 'Ошибка при входе через Google');
+        setError(popupErr.message || 'Вход через Google не удался из-за ограничений браузера. Пожалуйста, воспользуйтесь входом по Email.');
       }
+    } finally {
       setLoading(false);
     }
   };
@@ -293,6 +294,26 @@ export default function AuthModal() {
             <div className="space-y-4">
               {authMode === 'social' ? (
                 <div className="grid grid-cols-1 gap-3">
+                  {isInIframe && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1.5 mb-1 select-none hover:border-amber-500/30 transition-colors">
+                      <div className="flex items-center gap-1.5 text-amber-400 text-xs font-semibold">
+                        <AlertTriangle size={15} />
+                        <span>Режим предпросмотра</span>
+                      </div>
+                      <p className="text-[11px] text-amber-300/90 leading-relaxed text-left">
+                        Браузер блокирует авторизацию Google внутри фреймов AI Studio. Пожалуйста,{' '}
+                        <a 
+                          href={window.location.href} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="underline hover:text-white font-medium inline-flex items-center gap-0.5"
+                        >
+                          откройте сайт в новой вкладке <ExternalLink size={10} />
+                        </a>{' '}
+                        для входа через Google, либо войдите через <strong>Email</strong>.
+                      </p>
+                    </div>
+                  )}
                   <Button 
                     onClick={handleGoogleLogin} 
                     disabled={loading}
