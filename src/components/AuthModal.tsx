@@ -75,22 +75,9 @@ export default function AuthModal() {
     setLoading(true);
     setError('');
 
-    if (isTelegramWebApp()) {
-      setError('Вход через Google недоступен внутри Telegram (ограничение безопасности Google). Пожалуйста, используйте «Войти через Email» или откройте приложение в обычном браузере.');
-      // Optional: attempt to open in external browser
-      try {
-        if (window.Telegram?.WebApp?.openLink) {
-          // window.Telegram.WebApp.openLink(window.location.href);
-        }
-      } catch (e) {}
-      setLoading(false);
-      return;
-    }
-
     try {
       const provider = new GoogleAuthProvider();
       
-      // If inside Telegram Web App, popup might not work reliably, so we can try popup but fallback aggressively
       try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -101,8 +88,7 @@ export default function AuthModal() {
           setCurrentUser(user);
         }
       } catch (popupErr: any) {
-        console.warn('Popup failed, trying redirect...', popupErr);
-        // If user explicitly closed, don't redirect
+        console.error('Google popup error:', popupErr);
         if (popupErr.code === 'auth/popup-closed-by-user') {
           setLoading(false);
           return;
@@ -112,8 +98,11 @@ export default function AuthModal() {
           throw new Error('Домен не авторизован в Firebase Console. Добавьте ваш Vercel домен в Authorized Domains.');
         }
         
-        // Fallback to redirect for any other error (especially in Telegram Desktop/Mobile)
-        await signInWithRedirect(auth, provider);
+        if (popupErr.code === 'auth/popup-blocked') {
+          throw new Error('Браузер заблокировал всплывающее окно. Пожалуйста, разрешите всплывающие окна для этого сайта.');
+        }
+
+        throw new Error(popupErr.message || 'Вход через Google не удался. Ограничения браузера или встроенного окна.');
       }
     } catch (err: any) {
       console.error(err);
@@ -237,7 +226,7 @@ export default function AuthModal() {
       }
 
       // Force reload to ensure all states are correctly initialized
-      window.location.reload();
+      // window.location.reload(); // Removed because onSnapshot handles it and reload breaks Telegram Web App contexts
     } catch (err: any) {
       console.error(err);
       if (err.message?.includes('permission')) {
@@ -278,41 +267,15 @@ export default function AuthModal() {
             <div className="space-y-4">
               {authMode === 'social' ? (
                 <div className="grid grid-cols-1 gap-3">
-                  {isTelegramWebApp() ? (
-                    <div className="space-y-3">
-                      <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-center space-y-3">
-                        <p className="text-xs text-orange-400 leading-relaxed font-medium">
-                          Из-за ограничений безопасности Telegram, вход через Google недоступен внутри мессенджера.
-                        </p>
-                        <Button 
-                          onClick={() => {
-                            try {
-                              if (window.Telegram?.WebApp?.openLink) {
-                                window.Telegram.WebApp.openLink(window.location.href);
-                              }
-                            } catch (e) {
-                              console.error(e);
-                            }
-                          }}
-                          className="w-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center gap-2"
-                          size="sm"
-                        >
-                          <LogIn size={16} />
-                          Открыть в браузере (Chrome/Safari)
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button 
-                      onClick={handleGoogleLogin} 
-                      disabled={loading}
-                      className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
-                      size="lg"
-                    >
-                      {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-                      Войти через Google
-                    </Button>
-                  )}
+                  <Button 
+                    onClick={handleGoogleLogin} 
+                    disabled={loading}
+                    className="w-full bg-white text-black hover:bg-zinc-200 flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                    Войти через Google
+                  </Button>
 
                   <div className="relative my-2">
                     <div className="absolute inset-0 flex items-center">
