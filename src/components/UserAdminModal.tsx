@@ -181,6 +181,12 @@ export default function UserAdminModal({ user, isOpen, onClose, onUpdateUser, on
                 )}
               </CardTitle>
               <CardDescription className="text-base truncate">{user.email}</CardDescription>
+              {user.createdAt && (
+                <div className="text-[11px] text-zinc-500 mt-1.5 flex items-center gap-1">
+                  <Clock size={12} className="shrink-0 text-zinc-500" />
+                  <span>Дата регистрации: {new Date(user.createdAt).toLocaleDateString('ru-RU')} в {new Date(user.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>

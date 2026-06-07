@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle, Clock } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
 
@@ -956,6 +956,12 @@ Return ONLY the updated prompt text, no explanations.`;
                                 )}
                               </div>
                               <span className="text-xs text-zinc-400">{user.email}</span>
+                              {user.createdAt && (
+                                <span className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
+                                  <Clock size={10} className="shrink-0" />
+                                  <span>Регистрация: {new Date(user.createdAt).toLocaleDateString('ru-RU')}</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
