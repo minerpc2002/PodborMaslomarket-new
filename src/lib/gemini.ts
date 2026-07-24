@@ -637,33 +637,14 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
 
   onStatusChange?.('Поиск в каталоге...');
   
-  // 1. Try Ravenol by VIN directly first (highest priority)
+  // 1. Try Ravenol by VIN directly first
   let vehicleHint: string | undefined = vehicleHintParam;
-  let ravenolData = await fetchRavenolData(vin, vehicleHint);
-
-  // 1.2 If VIN looks like a JDM chassis (with or without hyphen), extract the chassis code
-  if (!ravenolData) {
-    let chassisCode = '';
-    if (vin.includes('-')) {
-      chassisCode = vin.split('-')[0];
-    } else {
-      // e.g. M110A005337 -> M110A
-      const jdmMatch = vin.match(/^([A-Z0-9]{3,6})[0-9]{6,7}$/);
-      if (jdmMatch) {
-        chassisCode = jdmMatch[1];
-      }
-    }
-    
-    if (chassisCode.length >= 3) {
-      onStatusChange?.('Поиск по коду кузова...');
-      ravenolData = await fetchRavenolData(chassisCode, vehicleHint);
-    }
-  }
+  let ravenolData = await fetchRavenolData(vin);
 
   // 1.5 If not found by VIN but we have a hint from photo, use it
   if (!ravenolData && vehicleHint) {
     onStatusChange?.(`Поиск технических данных...`);
-    ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
+    ravenolData = await fetchRavenolData(vehicleHint);
   }
 
   // 2. If not found, try NHTSA Decoder
@@ -673,7 +654,7 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
     if (vehicle) {
       vehicleHint = `${vehicle.make} ${vehicle.model} ${vehicle.year}`;
       onStatusChange?.(`Поиск технических данных...`);
-      ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
+      ravenolData = await fetchRavenolData(vehicleHint);
     }
   }
 
@@ -684,7 +665,7 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
     if (geminiHint) {
       vehicleHint = geminiHint;
       onStatusChange?.(`Поиск технических данных...`);
-      ravenolData = await fetchRavenolData(geminiHint, geminiHint);
+      ravenolData = await fetchRavenolData(vehicleHint);
     }
   }
   
@@ -775,14 +756,14 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
   const query = `${brand} ${model} ${year || ''} ${body || ''} ${engine || ''} ${transmission || ''}`.trim();
   
   onStatusChange?.('Поиск технических данных...');
-  let ravenolData = await fetchRavenolData(query, query);
+  let ravenolData = await fetchRavenolData(query);
 
   // Fallback: if specific query fails, try a simpler one (Brand + Model + Body)
   if (!ravenolData && (year || body || engine)) {
     onStatusChange?.('Уточнение параметров...');
     const simplerQuery = `${brand} ${model} ${body || ''}`.trim();
     if (simplerQuery !== query) {
-      ravenolData = await fetchRavenolData(simplerQuery, query);
+      ravenolData = await fetchRavenolData(simplerQuery);
     }
   }
 

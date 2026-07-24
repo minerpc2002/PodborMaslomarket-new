@@ -11,7 +11,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
   }
 };
 
-export async function fetchRavenolData(query: string, hint?: string): Promise<string | null> {
+export async function fetchRavenolData(query: string): Promise<string | null> {
   try {
     // 1. Search for the query (VIN or car details)
     const searchUrl = `https://podbor.ravenol.ru/search/?q=${encodeURIComponent(query)}`;
@@ -24,7 +24,6 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
     
     // Fallback to corsproxy.io if our proxy fails (e.g., Vercel IP blocked)
     if (!searchRes.ok) {
-      console.warn('Vercel proxy failed for Ravenol search, trying corsproxy.io...');
       try {
         searchRes = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(searchUrl)}`);
       } catch (e) {
@@ -37,54 +36,17 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
 
     let carHtml = '';
     
-    // Check if this is already a car page (redirected)
+    // Check if this is already a car page (redirected directly to result)
     if (searchHtml.includes('ravwidg-results') || searchHtml.includes('ravwidg-car-info') || searchHtml.includes('ravwidg-unit-title')) {
       carHtml = searchHtml;
     } else {
-      // 2. Extract the car page URLs from search results
-      // More flexible regex to catch links even if class order or other attributes change
-      const matches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"[^>]*class="[^"]*ravwidg-list-link[^"]*"[^>]*>([\s\S]*?)<\/a>/gi));
-      
-      if (matches.length === 0) {
-        console.warn(`No matches found for query: ${query}. Search HTML length: ${searchHtml.length}`);
-        // Fallback: try to find any link that looks like a car page
-        const fallbackMatches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi));
-        if (fallbackMatches.length > 0) {
-          console.log(`Found ${fallbackMatches.length} fallback matches for query: ${query}`);
-          matches.push(...fallbackMatches);
-        } else {
-          return null;
-        }
-      }
-      
-      // If there are multiple results and we have a hint, try to find the best match
-      let bestMatch = matches[0][1];
-      if (matches.length > 1 && hint) {
-        const hintLower = hint.toLowerCase();
-        const hintWords = hintLower.split(/[\s,]+/).filter(word => word.length > 1);
-        
-        let maxScore = -1;
-        for (const m of matches) {
-          // Inner text of the <a> tag, strip HTML tags for clean matching
-          const linkText = m[2].replace(/<[^>]*>/g, ' ').toLowerCase();
-          
-          let score = 0;
-          for (const word of hintWords) {
-             if (linkText.includes(word)) score += 1;
-          }
-          
-          if (score > maxScore) {
-            maxScore = score;
-            bestMatch = m[1];
-          }
-        }
-        
-        console.log(`Ravenol search for "${query}" returned ${matches.length} results. Hint: "${hint}". Picked: ${bestMatch} with score: ${maxScore}`);
-      }
+      // Extract the primary car page URL from search results
+      const match = searchHtml.match(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"/i);
+      if (!match) return null;
 
-      const carUrl = `https://podbor.ravenol.ru${bestMatch}`;
+      const carUrl = `https://podbor.ravenol.ru${match[1]}`;
 
-      // 3. Fetch the car page via proxy
+      // Fetch the car page via proxy
       let carRes;
       try {
         carRes = await fetchWithTimeout(`/api/proxy/ravenol?url=${encodeURIComponent(carUrl)}`);
@@ -94,7 +56,6 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
       
       // Fallback to corsproxy.io if our proxy fails
       if (!carRes.ok) {
-        console.warn('Vercel proxy failed for Ravenol car page, trying corsproxy.io...');
         try {
           carRes = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(carUrl)}`);
         } catch (e) {
@@ -106,7 +67,7 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
       carHtml = await carRes.text();
     }
 
-    // 4. Strip HTML tags to reduce token usage
+    // Strip HTML tags to reduce token usage
     const parser = new DOMParser();
     const doc = parser.parseFromString(carHtml, 'text/html');
     
