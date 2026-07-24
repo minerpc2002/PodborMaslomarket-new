@@ -638,8 +638,8 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
   onStatusChange?.('Поиск в каталоге...');
   
   // 1. Try Ravenol by VIN directly first (highest priority)
-  let ravenolData = await fetchRavenolData(vin);
   let vehicleHint: string | undefined = vehicleHintParam;
+  let ravenolData = await fetchRavenolData(vin, vehicleHint);
 
   // 1.2 If VIN looks like a JDM chassis (with or without hyphen), extract the chassis code
   if (!ravenolData) {
@@ -775,7 +775,7 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
   const query = `${brand} ${model} ${year || ''} ${body || ''} ${engine || ''} ${transmission || ''}`.trim();
   
   onStatusChange?.('Поиск технических данных...');
-  let ravenolData = await fetchRavenolData(query);
+  let ravenolData = await fetchRavenolData(query, query);
 
   // Fallback: if specific query fails, try a simpler one (Brand + Model + Body)
   if (!ravenolData && (year || body || engine)) {

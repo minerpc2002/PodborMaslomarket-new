@@ -43,12 +43,12 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
     } else {
       // 2. Extract the car page URLs from search results
       // More flexible regex to catch links even if class order or other attributes change
-      const matches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"[^>]*class="[^"]*ravwidg-list-link[^"]*"[^>]*>/g));
+      const matches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"[^>]*class="[^"]*ravwidg-list-link[^"]*"[^>]*>([\s\S]*?)<\/a>/gi));
       
       if (matches.length === 0) {
         console.warn(`No matches found for query: ${query}. Search HTML length: ${searchHtml.length}`);
         // Fallback: try to find any link that looks like a car page
-        const fallbackMatches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"/g));
+        const fallbackMatches = Array.from(searchHtml.matchAll(/<a[^>]+href="(\/[0-9]+-[a-z-]+\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi));
         if (fallbackMatches.length > 0) {
           console.log(`Found ${fallbackMatches.length} fallback matches for query: ${query}`);
           matches.push(...fallbackMatches);
@@ -61,20 +61,25 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
       let bestMatch = matches[0][1];
       if (matches.length > 1 && hint) {
         const hintLower = hint.toLowerCase();
-        const hintWords = hintLower.split(' ').filter(word => word.length > 2);
+        const hintWords = hintLower.split(/[\s,]+/).filter(word => word.length > 1);
         
-        let maxMatches = 0;
+        let maxScore = -1;
         for (const m of matches) {
-          const linkText = m[0].toLowerCase();
-          const matchCount = hintWords.filter(word => linkText.includes(word)).length;
+          // Inner text of the <a> tag, strip HTML tags for clean matching
+          const linkText = m[2].replace(/<[^>]*>/g, ' ').toLowerCase();
           
-          if (matchCount > maxMatches) {
-            maxMatches = matchCount;
+          let score = 0;
+          for (const word of hintWords) {
+             if (linkText.includes(word)) score += 1;
+          }
+          
+          if (score > maxScore) {
+            maxScore = score;
             bestMatch = m[1];
           }
         }
         
-        console.log(`Ravenol search for "${query}" returned ${matches.length} results. Hint: "${hint}". Picked: ${bestMatch}`);
+        console.log(`Ravenol search for "${query}" returned ${matches.length} results. Hint: "${hint}". Picked: ${bestMatch} with score: ${maxScore}`);
       }
 
       const carUrl = `https://podbor.ravenol.ru${bestMatch}`;

@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, History, Heart, ShieldCheck, User, Gift, HelpCircle, Info, LayoutDashboard, LogOut } from 'lucide-react';
+import { Home, Search, History, Heart, ShieldCheck, User, Gift, HelpCircle, Info, LayoutDashboard, LogOut, Wrench, X } from 'lucide-react';
+
 import { cn } from '../lib/utils';
 import { useEffect, useState } from 'react';
 import { setupTelegram } from '../lib/telegram';
@@ -26,12 +27,19 @@ const navItems = [
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { userProfile, activePromoCode, activeSearches, history } = useAppStore();
+  const { userProfile, activePromoCode, activeSearches, history, maintenanceConfig } = useAppStore();
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [isFAQModalOpen, setIsFAQModalOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isMaintenanceDismissed, setIsMaintenanceDismissed] = useState(false);
+
+  useEffect(() => {
+    if (maintenanceConfig?.enabled) {
+      setIsMaintenanceDismissed(false);
+    }
+  }, [maintenanceConfig?.enabled]);
 
   useEffect(() => {
     setupTelegram();
@@ -65,6 +73,34 @@ export default function Layout() {
       <HowItWorksModal isOpen={isHowItWorksOpen} onClose={() => setIsHowItWorksOpen(false)} />
       <SupportChatModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
       
+      {/* Maintenance Notification Banner */}
+      <AnimatePresence>
+        {maintenanceConfig?.enabled && !isMaintenanceDismissed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 border-b border-amber-300 text-amber-950 font-medium px-4 py-2.5 text-xs sm:text-sm z-[60] relative flex items-center justify-between gap-3 shadow-xl"
+          >
+            <div className="flex items-center gap-2.5 max-w-3xl mx-auto w-full justify-center text-center sm:text-left">
+              <div className="p-1 bg-amber-950/10 rounded-lg shrink-0">
+                <Wrench className="w-4 h-4 text-amber-950 animate-bounce" />
+              </div>
+              <span className="font-bold text-amber-950">
+                {maintenanceConfig.message || 'Ведутся технические работы. Приложение может работать со сбоями.'}
+              </span>
+            </div>
+            <button
+              onClick={() => setIsMaintenanceDismissed(true)}
+              className="p-1 hover:bg-amber-950/10 rounded-lg text-amber-950/80 hover:text-amber-950 transition-colors shrink-0"
+              title="Скрыть предупреждение"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.header 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}

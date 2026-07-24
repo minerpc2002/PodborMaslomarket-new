@@ -7,9 +7,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle, Clock } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle, Clock, Wrench } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
 import { auth, db } from '../firebase';
+import { MaintenanceConfig } from '../types';
 
 interface SupportMessage {
   id: string;
@@ -33,11 +34,22 @@ import { cn } from '../lib/utils';
 import { defaultPrompts } from '../lib/defaultPrompts';
 
 export default function Dashboard() {
-  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled, aiTemperature, setAiTemperature, aiPrompts, setAiPrompts } = useAppStore();
+  const { userProfile, aiModelsConfig, setAiModelsConfig, isSnowfallEnabled, setIsSnowfallEnabled, aiTemperature, setAiTemperature, aiPrompts, setAiPrompts, maintenanceConfig, setMaintenanceConfig } = useAppStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Maintenance Message State
+  const [maintenanceMessageInput, setMaintenanceMessageInput] = useState(
+    maintenanceConfig?.message || 'Ведутся технические работы. Приложение может работать со сбоями.'
+  );
+
+  useEffect(() => {
+    if (maintenanceConfig?.message) {
+      setMaintenanceMessageInput(maintenanceConfig.message);
+    }
+  }, [maintenanceConfig?.message]);
 
   // AI Prompts State
   const [editingPrompts, setEditingPrompts] = useState(aiPrompts);
@@ -444,6 +456,49 @@ Return ONLY the updated prompt text, no explanations.`;
       setUsers(users.map(u => u.uid === uid ? { ...u, supportBan: null } : u));
     } catch (err) {
       console.error('Error unbanning user:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleMaintenance = async () => {
+    if (!isAdmin) return;
+    setActionLoading('toggle-maintenance');
+    try {
+      const newEnabled = !maintenanceConfig.enabled;
+      const updated: MaintenanceConfig = {
+        enabled: newEnabled,
+        message: maintenanceMessageInput.trim() || 'Ведутся технические работы. Приложение может работать со сбоями.',
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
+      };
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        maintenanceConfig: updated
+      }, { merge: true });
+      setMaintenanceConfig(updated);
+    } catch (err) {
+      console.error('Error toggling maintenance:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSaveMaintenanceMessage = async () => {
+    if (!isAdmin) return;
+    setActionLoading('save-maintenance-msg');
+    try {
+      const updated: MaintenanceConfig = {
+        ...maintenanceConfig,
+        message: maintenanceMessageInput.trim() || 'Ведутся технические работы. Приложение может работать со сбоями.',
+        updatedAt: Date.now(),
+        updatedBy: auth.currentUser?.uid || userProfile?.uid || 'admin'
+      };
+      await setDoc(doc(db, 'settings', 'ai_config'), {
+        maintenanceConfig: updated
+      }, { merge: true });
+      setMaintenanceConfig(updated);
+    } catch (err) {
+      console.error('Error saving maintenance message:', err);
     } finally {
       setActionLoading(null);
     }
@@ -1306,11 +1361,85 @@ Return ONLY the updated prompt text, no explanations.`;
             <TabsContent value="ai_settings" className="space-y-6">
               <Card className="liquid-glass border-none">
                 <CardHeader>
-                  <CardTitle>Настройки нейросетей</CardTitle>
-                  <CardDescription>Управление доступом к AI и мониторинг нагрузки</CardDescription>
+                  <CardTitle>Системные настройки и Нейросети</CardTitle>
+                  <CardDescription>Управление режимом техработ, визуальными эффектами и параметрами AI</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Технические работы Card */}
+                    <div className="p-6 bg-amber-500/10 rounded-2xl border border-amber-500/20 space-y-4 col-span-1 md:col-span-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "p-3 rounded-xl shrink-0 transition-colors",
+                            maintenanceConfig?.enabled ? "bg-amber-500 text-black shadow-lg shadow-amber-500/30 animate-pulse" : "bg-amber-500/20 text-amber-400"
+                          )}>
+                            <Wrench size={24} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-zinc-100 text-base">Технические работы</h3>
+                              {maintenanceConfig?.enabled ? (
+                                <span className="px-2 py-0.5 bg-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-wider rounded-md border border-amber-500/40 animate-pulse">
+                                  АКТИВНО
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-wider rounded-md border border-zinc-700">
+                                  ОТКЛЮЧЕНО
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-0.5">
+                              Показывает баннер с предупреждением у всех пользователей приложения в реальном времени.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant={maintenanceConfig?.enabled ? 'destructive' : 'default'}
+                          className={cn(
+                            "h-11 px-5 font-bold transition-all shrink-0",
+                            maintenanceConfig?.enabled 
+                              ? "bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/20" 
+                              : "bg-amber-600 hover:bg-amber-700 text-white"
+                          )}
+                          onClick={handleToggleMaintenance}
+                          disabled={actionLoading === 'toggle-maintenance'}
+                        >
+                          {actionLoading === 'toggle-maintenance' ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <>
+                              <Power size={18} className="mr-2" />
+                              {maintenanceConfig?.enabled ? 'Отключить режим техработ' : 'Включить режим техработ'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      <div className="pt-2 space-y-2 border-t border-amber-500/10">
+                        <label className="text-xs font-semibold text-amber-300/80 flex items-center gap-1.5">
+                          Текст уведомления для пользователей:
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Input
+                            value={maintenanceMessageInput}
+                            onChange={(e) => setMaintenanceMessageInput(e.target.value)}
+                            placeholder="Ведутся технические работы. Приложение может работать со сбоями."
+                            className="bg-black/40 border-amber-500/20 text-zinc-200 placeholder:text-zinc-600 text-sm h-10 flex-1"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSaveMaintenanceMessage}
+                            disabled={actionLoading === 'save-maintenance-msg'}
+                            className="border-amber-500/30 text-amber-300 hover:bg-amber-500/20 h-10 px-4 shrink-0 font-medium"
+                          >
+                            {actionLoading === 'save-maintenance-msg' ? <Loader2 size={16} className="animate-spin" /> : 'Сохранить текст'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">

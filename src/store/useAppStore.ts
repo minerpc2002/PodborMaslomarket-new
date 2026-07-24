@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CarData, UserProfile, PromoCode, AiModelConfig, Notification, BackgroundSearch, AiPromptsConfig } from '../types';
+import { CarData, UserProfile, PromoCode, AiModelConfig, Notification, BackgroundSearch, AiPromptsConfig, MaintenanceConfig } from '../types';
 import { defaultPrompts } from '../lib/defaultPrompts';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
@@ -20,6 +20,7 @@ interface AppState {
   isSnowfallEnabled: boolean;
   aiTemperature: number;
   aiPrompts: AiPromptsConfig;
+  maintenanceConfig: MaintenanceConfig;
   activeSearches: BackgroundSearch[];
   notifications: Notification[];
   
@@ -39,6 +40,7 @@ interface AppState {
   setIsSnowfallEnabled: (enabled: boolean) => void;
   setAiTemperature: (temperature: number) => void;
   setAiPrompts: (prompts: AiPromptsConfig) => void;
+  setMaintenanceConfig: (config: MaintenanceConfig) => void;
   addActivatedPromoCode: (code: string) => void;
   
   addActiveSearch: (search: BackgroundSearch) => void;
@@ -74,6 +76,10 @@ export const useAppStore = create<AppState>()(
       isSnowfallEnabled: false,
       aiTemperature: 0.4,
       aiPrompts: defaultPrompts,
+      maintenanceConfig: {
+        enabled: false,
+        message: 'Ведутся технические работы. Приложение может работать со сбоями.'
+      },
       activeSearches: [],
       notifications: [],
       
@@ -111,6 +117,7 @@ export const useAppStore = create<AppState>()(
         set({ aiTemperature: isNaN(val) ? 0.4 : val });
       },
       setAiPrompts: (prompts) => set({ aiPrompts: prompts }),
+      setMaintenanceConfig: (config) => set({ maintenanceConfig: config }),
       addActivatedPromoCode: (code) => set((state) => ({
         userProfile: state.userProfile ? {
           ...state.userProfile,

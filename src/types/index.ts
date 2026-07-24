@@ -101,3 +101,10 @@ export interface AiPromptsConfig {
   manualNoData: string;
   manualWithData: string;
 }
+
+export interface MaintenanceConfig {
+  enabled: boolean;
+  message: string;
+  updatedAt?: number;
+  updatedBy?: string;
+}

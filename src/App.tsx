@@ -28,17 +28,20 @@ const PageLoader = () => (
 );
 
 export default function App() {
-  const { setUserProfile, setAuthReady, userProfile, setAuthError, setIsAiSearchEnabled, isSnowfallEnabled, setIsSnowfallEnabled } = useAppStore();
+  const { setUserProfile, setAuthReady, userProfile, setAuthError, setIsAiSearchEnabled, isSnowfallEnabled, setIsSnowfallEnabled, setMaintenanceConfig } = useAppStore();
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
 
-    // Listen to AI settings
+    // Listen to AI settings & system maintenance
     const unsubSettings = onSnapshot(doc(db, 'settings', 'ai_config'), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setIsAiSearchEnabled(data.isAiSearchEnabled ?? true);
         setIsSnowfallEnabled(data.isSnowfallEnabled ?? false);
+        if (data.maintenanceConfig) {
+          setMaintenanceConfig(data.maintenanceConfig);
+        }
       }
     });
 
