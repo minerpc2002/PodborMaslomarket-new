@@ -518,6 +518,72 @@ Return ONLY a JSON array of strings. Example: ["181 л.с. / 133 кВт", "249 �
   }
 }
 
+export async function recognizeVinFromPhoto(base64Image: string, mimeType: string = 'image/jpeg'): Promise<string> {
+  const ai = getGeminiClient();
+  const models = getEnabledModels();
+
+  if (models.length === 0) {
+    throw new Error('Модели ИИ отключены.');
+  }
+
+  // Strip data URL scheme prefix if present
+  const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
+
+  const promptText = `Проанализируй данное изображение (это может быть фото СТС/техпаспорта, маркировочной таблички под капотом, стойки кузова или VIN под лобовым стеклом).
+Найди VIN номер (Vehicle Identification Number, 17 символов) или номер кузова (для японских праворульных авто, например NZE141-1234567).
+
+Верни СТРОГО JSON следующий вид:
+{
+  "vin": "НАЙДЕННЫЙ_VIN_ИЛИ_НОМЕР_КУЗОВА"
+}
+Если VIN код не найден или размыт, верни:
+{
+  "vin": null,
+  "reason": "Не удалось чётко разобрать VIN код на фото"
+}`;
+
+  try {
+    const response = await callGeminiWithRetry(ai, {
+      model: models[0],
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType || 'image/jpeg',
+            data: cleanBase64
+          }
+        },
+        promptText
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
+      }
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new Error('ИИ не вернул ответа при анализе фото.');
+    }
+
+    const parsed = parseJsonFromAiResponse(text);
+    if (parsed && parsed.vin && typeof parsed.vin === 'string') {
+      const cleanVin = parsed.vin.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      if (cleanVin.length >= 6) {
+        return cleanVin;
+      }
+    }
+
+    if (parsed && parsed.reason) {
+      throw new Error(parsed.reason);
+    }
+
+    throw new Error('VIN код не обнаружен на изображении. Убедитесь, что фото чёткое и хорошо освещено.');
+  } catch (error: any) {
+    console.error('VIN Photo recognition failed:', error);
+    throw new Error(error.message || 'Ошибка распознавания VIN с фотографии');
+  }
+}
+
 export async function suggestTransmissions(brand: string, model: string, year: string, body: string, engine: string): Promise<string[]> {
   const ai = getGeminiClient();
 

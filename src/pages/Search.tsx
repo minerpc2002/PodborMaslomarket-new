@@ -1,12 +1,12 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, ChangeEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search as SearchIcon, ScanLine, Loader2, Settings2, Sparkles, ChevronRight, Info, HelpCircle, X, AlertTriangle } from 'lucide-react';
+import { Search as SearchIcon, ScanLine, Loader2, Settings2, Sparkles, ChevronRight, Info, HelpCircle, X, AlertTriangle, Camera, FileImage, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { searchByVin, searchByCarDetails, suggestCarBodies, suggestCarModels, suggestCarEngines, suggestEnginePower, suggestTransmissions } from '../lib/gemini';
+import { searchByVin, searchByCarDetails, suggestCarBodies, suggestCarModels, suggestCarEngines, suggestEnginePower, suggestTransmissions, recognizeVinFromPhoto } from '../lib/gemini';
 import { useAppStore } from '../store/useAppStore';
 import { logUserAction } from '../lib/logger';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,8 +26,12 @@ const YEARS = Array.from({ length: 2026 - 1990 + 1 }, (_, i) => (2026 - i).toStr
 export default function Search() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { addDynamicCar, canSearch, recordSearch, addActiveSearch, removeActiveSearch, addNotification, addToHistory } = useAppStore();
+  const { userProfile, addDynamicCar, canSearch, recordSearch, addActiveSearch, removeActiveSearch, addNotification, addToHistory } = useAppStore();
   
+  const isStaff = userProfile?.role === 'admin' || 
+                  userProfile?.role === 'moderator' || 
+                  userProfile?.email?.toLowerCase() === 'minerpc2002@gmail.com';
+
   const isMounted = useRef(true);
   useEffect(() => {
     isMounted.current = true;
@@ -140,6 +144,66 @@ export default function Search() {
   const [vin, setVin] = useState('');
   const [isSearchingVin, setIsSearchingVin] = useState(false);
   const [vinError, setVinError] = useState('');
+
+  // VIN Photo recognition state (Admin & Moderator)
+  const [isScanningVinPhoto, setIsScanningVinPhoto] = useState(false);
+  const [vinPhotoSuccessMsg, setVinPhotoSuccessMsg] = useState('');
+  const [vinPhotoPreviewUrl, setVinPhotoPreviewUrl] = useState<string | null>(null);
+  const vinFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleVinPhotoSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningVinPhoto(true);
+    setVinError('');
+    setVinPhotoSuccessMsg('');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        if (!base64) {
+          if (isMounted.current) {
+            setVinError('Не удалось прочитать файл изображения.');
+            setIsScanningVinPhoto(false);
+          }
+          return;
+        }
+
+        if (isMounted.current) {
+          setVinPhotoPreviewUrl(base64);
+        }
+
+        try {
+          const recognizedVin = await recognizeVinFromPhoto(base64, file.type);
+          if (isMounted.current) {
+            setVin(recognizedVin);
+            setVinPhotoSuccessMsg(`VIN успешно считан по фото: ${recognizedVin}`);
+            logUserAction('recognize_vin_photo', `Считан VIN с фото: ${recognizedVin}`);
+          }
+        } catch (err: any) {
+          if (isMounted.current) {
+            setVinError(err.message || 'Не удалось распознать VIN с фотографии.');
+          }
+        } finally {
+          if (isMounted.current) {
+            setIsScanningVinPhoto(false);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      if (isMounted.current) {
+        setVinError('Ошибка при обработке изображения');
+        setIsScanningVinPhoto(false);
+      }
+    } finally {
+      if (vinFileInputRef.current) {
+        vinFileInputRef.current.value = '';
+      }
+    }
+  };
 
   // Common Parameters
   const [mileage, setMileage] = useState('');
@@ -441,16 +505,39 @@ export default function Search() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4 liquid-glass p-1 rounded-2xl">
-          <TabsTrigger value="manual" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
-            По автомобилю
-          </TabsTrigger>
-          <TabsTrigger value="vin" className="flex items-center gap-1.5 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg">
-            По VIN коду
-            <span className="px-1.5 py-0.5 bg-amber-400 text-black text-[9px] font-black uppercase tracking-wider rounded-md">
-              pre-Release
+        <TabsList className={`grid w-full ${isStaff ? 'grid-cols-3' : 'grid-cols-2'} p-1 h-auto rounded-2xl liquid-glass gap-1 border border-white/5`}>
+          <TabsTrigger 
+            value="manual" 
+            className="py-2.5 px-1 sm:px-3 flex items-center justify-center gap-1 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold text-center"
+          >
+            <span className="truncate">
+              <span className="sm:hidden">По авто</span>
+              <span className="hidden sm:inline">По автомобилю</span>
             </span>
           </TabsTrigger>
+          
+          <TabsTrigger 
+            value="vin" 
+            className="py-2.5 px-1 sm:px-3 flex items-center justify-center gap-1 rounded-xl transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold text-center"
+          >
+            <span className="truncate">
+              <span className="sm:hidden">По VIN</span>
+              <span className="hidden sm:inline">По VIN коду</span>
+            </span>
+          </TabsTrigger>
+
+          {isStaff && (
+            <TabsTrigger 
+              value="vin-photo" 
+              className="py-2.5 px-1 sm:px-3 flex items-center justify-center gap-1 rounded-xl transition-all data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-bold text-purple-200 text-center"
+            >
+              <Camera size={14} className="text-amber-400 shrink-0 hidden xs:inline-block" />
+              <span className="truncate">
+                <span className="sm:hidden">По фото</span>
+                <span className="hidden sm:inline">По фото VIN</span>
+              </span>
+            </TabsTrigger>
+          )}
         </TabsList>
         
         <AnimatePresence mode="wait">
@@ -745,9 +832,19 @@ export default function Search() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
+                {/* Hidden File Input for Camera/Gallery upload */}
+                <input 
+                  type="file" 
+                  ref={vinFileInputRef} 
+                  accept="image/*" 
+                  capture="environment" 
+                  onChange={handleVinPhotoSelect} 
+                  className="hidden" 
+                />
+
                 <Card className="border-none shadow-xl liquid-glass rounded-3xl overflow-hidden">
                   <CardContent className="pt-6 space-y-5">
-                    <div className="p-4 bg-amber-900/20 border border-amber-800 rounded-2xl flex gap-3">
+                    <div className="p-4 bg-amber-900/20 border border-amber-800/60 rounded-2xl flex gap-3">
                       <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <p className="text-sm font-bold text-amber-300">Внимание: pre-Release версия</p>
@@ -759,33 +856,51 @@ export default function Search() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-zinc-300">
-                        VIN код автомобиля
+                      <label className="text-sm font-semibold text-zinc-300 flex items-center justify-between">
+                        <span>VIN код автомобиля</span>
+                        <span className="text-[11px] text-zinc-500 font-normal">17 символов или номер кузова</span>
                       </label>
                       <Input 
                         placeholder="WVGZZZ..." 
                         value={vin}
-                        onChange={(e) => setVin(e.target.value.toUpperCase())}
-                        disabled={isSearchingVin}
-                        className="h-14 rounded-xl bg-zinc-800/50 border-none focus:ring-2 focus:ring-purple-500 uppercase font-mono text-lg tracking-wider transition-all"
+                        onChange={(e) => {
+                          setVin(e.target.value.toUpperCase());
+                          if (vinPhotoSuccessMsg) setVinPhotoSuccessMsg('');
+                        }}
+                        disabled={isSearchingVin || isScanningVinPhoto}
+                        className="h-14 rounded-xl bg-zinc-800/60 border border-white/5 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/30 uppercase font-mono text-lg tracking-wider transition-all text-zinc-100 placeholder:text-zinc-600"
                         maxLength={17}
                       />
+
                       <AnimatePresence>
+                        {vinPhotoSuccessMsg && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2 shadow-sm"
+                          >
+                            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                            <span>{vinPhotoSuccessMsg}</span>
+                          </motion.div>
+                        )}
+
                         {vinError && (
                           <motion.p 
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="text-sm text-red-500 font-medium"
+                            className="text-sm text-red-400 font-medium pt-1"
                           >
                             {vinError}
                           </motion.p>
                         )}
                       </AnimatePresence>
-                      <div className="p-4 rounded-2xl bg-purple-900/20 border border-purple-800/50">
-                        <p className="text-xs text-purple-300 leading-relaxed flex gap-2">
-                          <ScanLine size={14} className="flex-shrink-0 mt-0.5" />
-                          ИИ проанализирует VIN и автоматически подберет подходящие жидкости.
+
+                      <div className="p-3.5 rounded-2xl bg-purple-900/15 border border-purple-800/40">
+                        <p className="text-xs text-purple-300/90 leading-relaxed flex gap-2">
+                          <ScanLine size={14} className="flex-shrink-0 mt-0.5 text-purple-400" />
+                          <span>ИИ мгновенно проанализирует VIN код и сформирует полный список рекомендуемых жидкостей и объёмов.</span>
                         </p>
                       </div>
                     </div>
@@ -798,23 +913,215 @@ export default function Search() {
                       className="mt-4"
                     />
 
+                    {/* Updated Stylish VIN Search Button */}
                     <Button 
-                      className="w-full mt-4 shimmer-ai-bg hover:opacity-90 text-white rounded-2xl h-14 text-lg font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 border border-white/10 disabled:opacity-50" 
+                      className="relative w-full mt-4 h-14 rounded-2xl font-bold text-base sm:text-lg text-white shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] transition-all duration-300 active:scale-[0.98] border border-purple-400/30 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-600 overflow-hidden group disabled:opacity-50" 
                       size="lg"
-                      disabled={!vin || isSearchingVin}
+                      disabled={!vin || isSearchingVin || isScanningVinPhoto}
                       onClick={handleVinSearch}
                     >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
                       {isSearchingVin ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Идет анализ VIN...
-                        </>
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-purple-200" />
+                          <span>Идет анализ VIN данных...</span>
+                        </div>
                       ) : (
-                        <>
-                          <ScanLine className="mr-2 h-5 w-5" />
-                          Найти по VIN
-                          <ChevronRight className="ml-2 h-5 w-5 opacity-50" />
-                        </>
+                        <div className="flex items-center justify-center gap-2">
+                          <ScanLine className="h-5 w-5 text-cyan-300 animate-pulse" />
+                          <span className="tracking-wide">Найти по VIN коду</span>
+                          <ChevronRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </TabsContent>
+          )}
+
+          {activeTab === 'vin-photo' && isStaff && (
+            <TabsContent value="vin-photo" key="vin-photo" forceMount>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="border border-purple-500/30 shadow-2xl liquid-glass rounded-3xl overflow-hidden bg-gradient-to-b from-purple-950/20 via-zinc-900/60 to-black/80">
+                  <CardContent className="pt-6 space-y-6">
+                    
+                    {/* Header Banner */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900/50 via-zinc-900 to-indigo-950/50 border border-purple-500/40 flex items-start justify-between gap-3 shadow-lg">
+                      <div className="flex gap-3 items-start">
+                        <div className="w-10 h-10 rounded-xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center shrink-0 mt-0.5">
+                          <Camera className="text-amber-400" size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            Распознавание VIN по фотографии
+                          </h3>
+                          <p className="text-xs text-zinc-300 mt-0.5 leading-relaxed">
+                            Нейросеть Gemini автоматически найдет 17-значный VIN или номер кузова на фото СТС, техпаспорта, маркировочной таблички или под лобовым стеклом.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-wider rounded-lg border border-amber-500/40 shrink-0 flex items-center gap-1 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        Экспериментально
+                      </span>
+                    </div>
+
+                    {/* Image Dropzone & Preview Box */}
+                    <div className="space-y-3">
+                      <label className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-2">
+                        <FileImage size={14} className="text-amber-400" />
+                        <span>Фотография СТС или маркировки</span>
+                      </label>
+
+                      {vinPhotoPreviewUrl ? (
+                        <div className="relative rounded-2xl border border-purple-500/40 bg-black/60 p-3 overflow-hidden flex flex-col items-center gap-3">
+                          <img 
+                            src={vinPhotoPreviewUrl} 
+                            alt="Загруженный документ VIN" 
+                            className="max-h-56 w-auto object-contain rounded-xl border border-white/10 shadow-md" 
+                          />
+                          <div className="flex items-center gap-2 w-full">
+                            <Button
+                              type="button"
+                              onClick={() => vinFileInputRef.current?.click()}
+                              disabled={isScanningVinPhoto}
+                              variant="outline"
+                              className="flex-1 h-10 text-xs font-bold rounded-xl border-purple-500/40 bg-purple-900/30 text-purple-200 hover:bg-purple-800/40"
+                            >
+                              <Camera size={14} className="mr-1.5 text-amber-400" />
+                              Загрузить другое фото
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                setVinPhotoPreviewUrl(null);
+                                setVinPhotoSuccessMsg('');
+                              }}
+                              disabled={isScanningVinPhoto}
+                              variant="ghost"
+                              className="h-10 px-3 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-xl"
+                            >
+                              <X size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => vinFileInputRef.current?.click()}
+                          className="border-2 border-dashed border-purple-500/40 hover:border-purple-400 bg-purple-950/20 hover:bg-purple-900/30 rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group"
+                        >
+                          <div className="w-14 h-14 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Camera className="w-7 h-7 text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-zinc-200 group-hover:text-white">
+                              Нажмите, чтобы сделать или выбрать фото
+                            </p>
+                            <p className="text-xs text-zinc-400 mt-1">
+                              Поддерживаются JPG, PNG, WEBP (СТС, шильдик, кузов)
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        type="button"
+                        onClick={() => vinFileInputRef.current?.click()}
+                        disabled={isScanningVinPhoto || isSearchingVin}
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-900/40 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isScanningVinPhoto ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin text-purple-200" />
+                            <span>ИИ распознает VIN на фото...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 text-amber-300" />
+                            <span>{vinPhotoPreviewUrl ? 'Сканировать фото заново' : 'Загрузить и сканировать фото'}</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Detected VIN Input */}
+                    <div className="space-y-2 pt-2 border-t border-purple-500/20">
+                      <label className="text-sm font-semibold text-zinc-200 flex items-center justify-between">
+                        <span>Распознанный VIN код</span>
+                        <span className="text-[11px] text-zinc-400 font-normal">Можно отредактировать вручную</span>
+                      </label>
+                      
+                      <Input 
+                        placeholder="VIN код появится здесь..." 
+                        value={vin}
+                        onChange={(e) => {
+                          setVin(e.target.value.toUpperCase());
+                          if (vinPhotoSuccessMsg) setVinPhotoSuccessMsg('');
+                        }}
+                        disabled={isSearchingVin || isScanningVinPhoto}
+                        className="h-14 rounded-xl bg-zinc-900/80 border border-purple-500/40 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/30 uppercase font-mono text-lg tracking-wider text-zinc-100 placeholder:text-zinc-600"
+                        maxLength={17}
+                      />
+
+                      <AnimatePresence>
+                        {vinPhotoSuccessMsg && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-2 shadow-sm"
+                          >
+                            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                            <span>{vinPhotoSuccessMsg}</span>
+                          </motion.div>
+                        )}
+
+                        {vinError && (
+                          <motion.p 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="text-sm text-red-400 font-medium pt-1"
+                          >
+                            {vinError}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {renderCommonParams()}
+
+                    <SearchProgressBar 
+                      isSearching={isSearchingVin} 
+                      statusText={searchStatus} 
+                      className="mt-4"
+                    />
+
+                    {/* Search Execute Button */}
+                    <Button 
+                      className="relative w-full mt-4 h-14 rounded-2xl font-bold text-base sm:text-lg text-white shadow-[0_0_25px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.6)] transition-all duration-300 active:scale-[0.98] border border-purple-400/40 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-600 overflow-hidden group disabled:opacity-50" 
+                      size="lg"
+                      disabled={!vin || isSearchingVin || isScanningVinPhoto}
+                      onClick={handleVinSearch}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
+                      {isSearchingVin ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-purple-200" />
+                          <span>Поиск технических жидкостей по VIN...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <ScanLine className="h-5 w-5 text-amber-300 animate-pulse" />
+                          <span className="tracking-wide">Найти подбор по VIN коду</span>
+                          <ChevronRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 transition-transform" />
+                        </div>
                       )}
                     </Button>
                   </CardContent>

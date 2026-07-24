@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom';
-import { Search, ScanLine, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, ScanLine, ArrowRight, Sparkles, Camera } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { motion } from 'motion/react';
+import { useAppStore } from '../store/useAppStore';
 
 export default function Home() {
+  const { userProfile } = useAppStore();
+  const isStaff = userProfile?.role === 'admin' || 
+                  userProfile?.role === 'moderator' || 
+                  userProfile?.email?.toLowerCase() === 'minerpc2002@gmail.com';
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -69,6 +75,55 @@ export default function Home() {
             </div>
           </Link>
         </motion.div>
+
+        {/* Experimental Staff Feature Card */}
+        {isStaff && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.25, duration: 0.5 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Link to="/search" state={{ tab: 'vin-photo' }} className="block group">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-900/60 via-zinc-900/80 to-indigo-950/80 backdrop-blur-xl border border-purple-500/40 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-purple-500/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/30 via-pink-600/20 to-indigo-600/30 animate-pulse opacity-60" />
+                <div className="relative bg-black/50 rounded-[23px] p-6 text-white overflow-hidden">
+                  <div className="absolute -right-6 -top-6 opacity-15 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700 text-purple-300">
+                    <Camera size={120} strokeWidth={1} />
+                  </div>
+                  
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-purple-600/20 rounded-xl flex items-center justify-center border border-purple-500/30">
+                        <Camera className="text-amber-400" size={20} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold font-display tracking-tight text-white flex items-center gap-1.5">
+                          По фото VIN
+                        </h3>
+                        <p className="text-[9px] text-purple-300 uppercase tracking-widest font-medium">Распознавание ИИ</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-wider rounded-md border border-amber-500/40 flex items-center gap-1 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                      Экспериментально
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-zinc-300 max-w-[180px] leading-snug">
+                      Сканирование VIN/кузова с фото СТС или таблички
+                    </p>
+                    <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-400/30 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                      <ArrowRight size={14} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}

@@ -2,7 +2,7 @@ import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAppStore } from '../store/useAppStore';
 
-export type LogActionType = 'search_vin' | 'search_manual' | 'activate_promo';
+export type LogActionType = 'search_vin' | 'search_manual' | 'activate_promo' | 'recognize_vin_photo';
 
 export interface UserLog {
   userId: string;
