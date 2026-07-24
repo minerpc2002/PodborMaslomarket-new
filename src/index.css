@@ -179,3 +179,31 @@ html, body {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+@keyframes gradient-progress-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes progress-shimmer-pass {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+.gradient-progress-fill {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #06b6d4, #3b82f6);
+  background-size: 250% 200%;
+  animation: gradient-progress-flow 2.5s ease infinite;
+}
+
+.progress-shimmer-beam {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  animation: progress-shimmer-pass 1.8s ease-in-out infinite;
+}
+

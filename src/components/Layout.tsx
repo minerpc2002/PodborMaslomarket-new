@@ -37,6 +37,10 @@ export default function Layout() {
     setupTelegram();
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname]);
+
   const isPromoActive = activePromoCode && activePromoCode.expiresAt > Date.now();
   const isStaff = userProfile?.role === 'admin' || 
                   userProfile?.role === 'moderator' || 
@@ -142,10 +146,12 @@ export default function Layout() {
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 border border-blue-500/30 rounded-full ml-1"
+                className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-600/30 via-purple-600/30 to-pink-600/30 border border-purple-500/40 rounded-full ml-1 shadow-[0_0_12px_rgba(168,85,247,0.35)]"
               >
-                <Loader2 size={14} className="text-blue-400 animate-spin" />
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Поиск...</span>
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                  ИИ Поиск...
+                </span>
               </motion.div>
             )}
 

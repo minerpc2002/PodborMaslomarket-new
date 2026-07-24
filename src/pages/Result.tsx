@@ -19,6 +19,7 @@ export default function Result() {
   const isDynamic = !mockCars.some(c => c.id === id);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     if (car) {
       addToHistory(car);
     }

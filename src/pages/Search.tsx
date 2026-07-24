@@ -11,6 +11,7 @@ import { useAppStore } from '../store/useAppStore';
 import { logUserAction } from '../lib/logger';
 import { motion, AnimatePresence } from 'motion/react';
 import { v4 as uuidv4 } from 'uuid';
+import SearchProgressBar from '../components/SearchProgressBar';
 
 const POPULAR_BRANDS = [
   'Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru', 'Mitsubishi', 'Suzuki', 'Lexus', 'Infiniti', 'Acura',
@@ -692,13 +693,19 @@ export default function Search() {
 
                     {renderCommonParams()}
 
+                    <SearchProgressBar 
+                      isSearching={isSearchingManual} 
+                      statusText={searchStatus} 
+                      className="mt-4"
+                    />
+
                     <AnimatePresence>
                       {manualError && (
                         <motion.p 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="text-sm text-red-500 font-medium"
+                          className="text-sm text-red-500 font-medium mt-2"
                         >
                           {manualError}
                         </motion.p>
@@ -706,7 +713,7 @@ export default function Search() {
                     </AnimatePresence>
                     
                     <Button 
-                      className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-12 text-base font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95" 
+                      className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-12 text-base font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50" 
                       size="lg"
                       disabled={!brand || !model || !body || isSearchingManual}
                       onClick={handleManualSearch}
@@ -714,7 +721,7 @@ export default function Search() {
                       {isSearchingManual ? (
                         <>
                           <div className="ai-loader mr-2" />
-                          {searchStatus || 'Поиск в базе...'}
+                          Выполняется поиск...
                         </>
                       ) : (
                         <>
@@ -785,8 +792,14 @@ export default function Search() {
 
                     {renderCommonParams()}
 
+                    <SearchProgressBar 
+                      isSearching={isSearchingVin} 
+                      statusText={searchStatus} 
+                      className="mt-4"
+                    />
+
                     <Button 
-                      className="w-full mt-4 shimmer-ai-bg hover:opacity-90 text-white rounded-2xl h-14 text-lg font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 border border-white/10" 
+                      className="w-full mt-4 shimmer-ai-bg hover:opacity-90 text-white rounded-2xl h-14 text-lg font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 border border-white/10 disabled:opacity-50" 
                       size="lg"
                       disabled={!vin || isSearchingVin}
                       onClick={handleVinSearch}
@@ -794,7 +807,7 @@ export default function Search() {
                       {isSearchingVin ? (
                         <>
                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          {searchStatus || 'Анализ VIN кода...'}
+                          Идет анализ VIN...
                         </>
                       ) : (
                         <>
