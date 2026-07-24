@@ -91,7 +91,7 @@ const productSchema = {
 const recommendationSchema = {
   type: Type.OBJECT,
   properties: {
-    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. Если для одного узла (например, раздаточная коробка или дифференциал) есть несколько модификаций, выведи каждую ОТДЕЛЬНО с уточнением в названии (например, 'Дифференциал, задний (с LSD)'). ОБЯЗАТЕЛЬНО включи: 'Масло в двигатель', 'Коробка передач', 'Раздаточная коробка', 'Дифференциал, передний', 'Дифференциал, задний', 'ГУР', 'Тормозная система', 'Система активной регулировки кузова', 'Система охлаждения', 'Система охлаждения, промежуточный охладитель'" },
+    unit: { type: Type.STRING, description: "Название узла на РУССКОМ языке. Если для одного узла (например, раздаточная коробка или дифференциал) есть несколько модификаций, выведи каждую ОТДЕЛЬНО с уточнением в названии (например, 'Дифференциал, задний (с LSD)'). Если узел не применим к автомобилю (например, нет ГУР или раздаточной коробки), ПРОПУСТИ ЕГО, не добавляй в список." },
     fluid_type: { type: Type.STRING },
     factory_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная заводом-изготовителем" },
     recommended_viscosity: { type: Type.STRING, description: "Вязкость, рекомендованная с учетом пробега и условий эксплуатации" },
@@ -160,10 +160,7 @@ function getEnabledModels(): string[] {
   
   // Default fallback
   return [
-    'gemini-3.1-pro-preview',
-    'gemini-3.1-flash-preview',
-    'gemini-3-flash-preview',
-    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-pro',
     'gemini-2.5-flash'
   ];
 }
@@ -375,20 +372,53 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
   }
 }
 
-async function getGeminiVinHint(ai: any, vin: string): Promise<string | null> {
+async function getGeminiVinHint(ai: any, vin: string): Promise<{ hint: string; searchTerms: string[] } | null> {
   try {
-    const prompt = `Decode this VIN: ${vin}. Return ONLY the Brand and Model. Example: "BMW X4". 
-    IMPORTANT: This is a specialized task. Do not guess. 
-    If you are not 100% sure, return "Unknown".`;
-    
+    const prompt = `You are an expert automotive VIN and Chassis decoder for ALL world vehicles (Mercedes-Benz, BMW, Audi, VW, Skoda, SEAT, Porsche, Toyota, Lexus, Nissan, Infiniti, Honda, Acura, Hyundai, Kia, Mazda, Subaru, Mitsubishi, Suzuki, Volvo, Ford, Opel, Peugeot, Citroen, Renault, Chery, Haval, Geely, Changan, etc.).
+Analyze this VIN / Frame / Chassis number: ${vin}.
+
+Identify:
+1. Brand (e.g. BMW, Audi, Toyota, Nissan, Kia, Mercedes-Benz, Volkswagen, Subaru)
+2. Exact Model name and trim (e.g. 320i, A4 2.0 TFSI, Allion 1.8, X-Trail 2.0, Rio 1.6, C 200, Forester 2.0)
+3. Chassis/Generation/Body code (e.g. F30, 8K, ZRT260, NT32, FB, W205, SJ5)
+4. Exact Chassis or Model code (e.g. F30, 8K2, ZRT260, NT32, G4FG, 205.077, SJ5)
+5. Generate an array of search_terms specifically formatted to match how the oil catalog (podbor.ravenol.ru) indexes vehicles.
+Include:
+- Model/Chassis code (e.g. "205.077", "F30", "8K2", "ZRT260", "NT32", "SJ5")
+- Brand + Model + Chassis (e.g. "BMW F30 320i", "Audi A4 8K", "Toyota Allion ZRT260", "Nissan X-Trail T32", "Kia Rio 1.6", "Subaru Forester SJ")
+- Model + Chassis / Engine (e.g. "320i F30", "Rio IV 1.6", "Forester 2.0 SJ", "A4 B8 2.0")
+
+Return ONLY JSON in this format:
+{
+  "brand": "string",
+  "model": "string",
+  "chassis": "string",
+  "model_code": "string",
+  "vehicle_hint": "string",
+  "search_terms": ["string"]
+}`;
+
     const response = await callGeminiWithRetry(ai, {
       contents: prompt,
       config: {
-        temperature: 0,
+        responseMimeType: 'application/json',
+        temperature: 0.1,
       }
     }, 1);
+
     const text = response.text?.trim();
-    return text === 'Unknown' ? null : text;
+    if (!text) return null;
+    const parsed = parseJsonFromAiResponse(text);
+    if (!parsed) return null;
+
+    const vehicleHint = parsed.vehicle_hint || `${parsed.brand || ''} ${parsed.model || ''} ${parsed.chassis || ''} ${parsed.model_code || ''}`.trim();
+    const searchTerms: string[] = Array.isArray(parsed.search_terms) ? parsed.search_terms : [];
+    if (parsed.model_code) searchTerms.unshift(parsed.model_code);
+
+    return {
+      hint: vehicleHint,
+      searchTerms: Array.from(new Set(searchTerms)).filter(Boolean)
+    };
   } catch (e) {
     return null;
   }
@@ -632,43 +662,93 @@ Return ONLY a JSON array of strings. Example: ["АКПП", "МКПП", "Вари
   }
 }
 
-export async function searchByVin(vin: string, mileage?: string, conditions?: string, power?: string, handDrive?: string, fuelType?: string, onStatusChange?: (status: string) => void, vehicleHintParam?: string): Promise<CarData> {
+export async function searchByVin(
+  vin: string,
+  mileage?: string,
+  conditions?: string,
+  power?: string,
+  handDrive?: string,
+  fuelType?: string,
+  onStatusChange?: (status: string) => void,
+  vehicleHintParam?: string
+): Promise<CarData> {
   const ai = getGeminiClient();
 
   onStatusChange?.('Поиск в каталоге...');
   
-  // 1. Try Ravenol by VIN directly first
+  const cleanVin = vin.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
   let vehicleHint: string | undefined = vehicleHintParam;
-  let ravenolData = await fetchRavenolData(vin);
+  let ravenolData: string | null = null;
 
-  // 1.5 If not found by VIN but we have a hint from photo, use it
-  if (!ravenolData && vehicleHint) {
-    onStatusChange?.(`Поиск технических данных...`);
-    ravenolData = await fetchRavenolData(vehicleHint);
+  // 1. Direct model code queries extracted deterministically from VIN
+  const directQueries: string[] = [cleanVin];
+  if (cleanVin !== vin) directQueries.push(vin);
+
+  if (cleanVin.length === 17) {
+    const wmi = cleanVin.substring(0, 3);
+    const vds = cleanVin.substring(3, 9); // e.g. 205077
+    
+    if (wmi.startsWith('WD') || wmi.startsWith('W1') || wmi.startsWith('W2') || wmi.startsWith('3F') || wmi.startsWith('WM')) {
+      // Mercedes VIN format: 205077 -> 205.077
+      directQueries.push(`${vds.substring(0, 3)}.${vds.substring(3)}`);
+      directQueries.push(vds);
+    } else if (wmi === 'WAU' || wmi === 'WVW' || wmi === 'TMB' || wmi === 'WP0' || wmi === 'TRU' || wmi === 'WVG' || wmi === '3VW' || wmi === 'VSS') {
+      // VAG platform code at positions 7-8 (index 6-7)
+      const vagCode = cleanVin.substring(6, 8);
+      if (/^[A-Z0-9]{2}$/.test(vagCode)) {
+        directQueries.push(vagCode);
+      }
+    } else {
+      directQueries.push(vds);
+    }
+  } else if (cleanVin.includes('-')) {
+    const chassisPrefix = cleanVin.split('-')[0];
+    if (chassisPrefix.length >= 3) directQueries.push(chassisPrefix);
+  } else {
+    // Japanese JDM frame without hyphen (e.g. ZRT2600012345, NT32012345, SJ500123)
+    const jdmMatch = cleanVin.match(/^([A-Z]{1,4}[0-9]{1,3}[A-Z]{0,2})[0-9]{5,7}$/);
+    if (jdmMatch && jdmMatch[1].length >= 3) {
+      directQueries.push(jdmMatch[1]);
+    }
   }
 
-  // 2. If not found, try NHTSA Decoder
+  // Try direct queries on Ravenol
+  for (const q of directQueries) {
+    ravenolData = await fetchRavenolData(q, vehicleHint);
+    if (ravenolData) break;
+  }
+
+  // 1.5 Try photo vehicle hint if available
+  if (!ravenolData && vehicleHint) {
+    onStatusChange?.('Поиск по описанию...');
+    ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
+  }
+
+  // 2. Try Gemini AI VIN decoder for exact Ravenol search terms (e.g. 205.077, W205 C200)
+  if (!ravenolData) {
+    onStatusChange?.('Интеллектуальный анализ VIN...');
+    const geminiResult = await getGeminiVinHint(ai, cleanVin);
+    if (geminiResult) {
+      vehicleHint = vehicleHint || geminiResult.hint;
+      for (const term of geminiResult.searchTerms) {
+        onStatusChange?.(`Поиск технических данных (${term})...`);
+        ravenolData = await fetchRavenolData(term, vehicleHint);
+        if (ravenolData) break;
+      }
+    }
+  }
+
+  // 3. Fallback to NHTSA decoder
   if (!ravenolData && (!vehicleHint || vehicleHint.length < 5)) {
     onStatusChange?.('Идентификация автомобиля...');
-    const vehicle = await decodeVin(vin);
-    if (vehicle) {
-      vehicleHint = `${vehicle.make} ${vehicle.model} ${vehicle.year}`;
+    const vehicle = await decodeVin(cleanVin);
+    if (vehicle && vehicle.make) {
+      vehicleHint = `${vehicle.make} ${vehicle.model} ${vehicle.year}`.trim();
       onStatusChange?.(`Поиск технических данных...`);
-      ravenolData = await fetchRavenolData(vehicleHint);
+      ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
     }
   }
 
-  // 3. If still not found, try Gemini for a hint (neural network as last resort for decoding)
-  if (!ravenolData && (!vehicleHint || vehicleHint.length < 5)) {
-    onStatusChange?.('Интеллектуальный анализ VIN...');
-    const geminiHint = await getGeminiVinHint(ai, vin);
-    if (geminiHint) {
-      vehicleHint = geminiHint;
-      onStatusChange?.(`Поиск технических данных...`);
-      ravenolData = await fetchRavenolData(vehicleHint);
-    }
-  }
-  
   if (!ravenolData && !vehicleHint) {
     throw new Error('Автомобиль с таким VIN не найден. Пожалуйста, проверьте VIN или воспользуйтесь ручным поиском.');
   }
@@ -754,16 +834,25 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
   const ai = getGeminiClient();
 
   const query = `${brand} ${model} ${year || ''} ${body || ''} ${engine || ''} ${transmission || ''}`.trim();
+  const carHint = `${brand} ${model} ${body || ''} ${engine || ''}`.trim();
   
   onStatusChange?.('Поиск технических данных...');
-  let ravenolData = await fetchRavenolData(query);
+  let ravenolData = await fetchRavenolData(query, carHint);
 
-  // Fallback: if specific query fails, try a simpler one (Brand + Model + Body)
+  // Fallback 1: Brand + Model + Body/Generation
   if (!ravenolData && (year || body || engine)) {
     onStatusChange?.('Уточнение параметров...');
     const simplerQuery = `${brand} ${model} ${body || ''}`.trim();
     if (simplerQuery !== query) {
-      ravenolData = await fetchRavenolData(simplerQuery);
+      ravenolData = await fetchRavenolData(simplerQuery, carHint);
+    }
+  }
+
+  // Fallback 2: Brand + Model
+  if (!ravenolData) {
+    const basicQuery = `${brand} ${model}`.trim();
+    if (basicQuery !== query && basicQuery !== `${brand} ${model} ${body || ''}`.trim()) {
+      ravenolData = await fetchRavenolData(basicQuery, carHint);
     }
   }
 
