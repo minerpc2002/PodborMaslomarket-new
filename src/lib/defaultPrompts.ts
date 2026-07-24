@@ -28,7 +28,7 @@ export const defaultPrompts = {
 {{RAVENOL_DATA}}
 </technical_data>
 3. MANDATORY TASK: 
-   - You MUST identify the car EXACTLY as it is written in the <technical_data>.
+   - You MUST identify the car based on the <technical_data>. HOWEVER, if the {{VEHICLE_HINT_SECTION}} or the {{VIN}} provides a more specific model name (e.g. "Move Custom" instead of "Move") or a more specific chassis code (e.g. "M110A" instead of "M100"), you MUST use the specific name and chassis from the hint or VIN for the final "brand" and "model" fields.
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 4. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.
@@ -79,7 +79,7 @@ Vehicle: {{QUERY}}.
 {{RAVENOL_DATA}}
 </technical_data>
 2. MANDATORY TASK: 
-   - You MUST identify the car EXACTLY as it is written in the <technical_data>.
+   - You MUST identify the car based on the <technical_data>. HOWEVER, if the original QUERY provides a more specific model name (e.g. "Move Custom" instead of "Move") or a more specific chassis code (e.g. "M110A" instead of "M100"), you MUST use the specific name and chassis from the QUERY for the final "brand" and "model" fields.
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 3. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.
