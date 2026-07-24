@@ -961,9 +961,6 @@ export default function Search() {
                           <h3 className="text-sm font-bold text-white flex items-center gap-2">
                             Распознавание VIN по фотографии
                           </h3>
-                          <p className="text-xs text-zinc-300 mt-0.5 leading-relaxed">
-                            Нейросеть Gemini автоматически найдет 17-значный VIN или номер кузова на фото СТС, техпаспорта, маркировочной таблички или под лобовым стеклом.
-                          </p>
                         </div>
                       </div>
                       <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-wider rounded-lg border border-amber-500/40 shrink-0 flex items-center gap-1 shadow-sm">
@@ -978,6 +975,14 @@ export default function Search() {
                         <FileImage size={14} className="text-amber-400" />
                         <span>Фотография СТС или маркировки</span>
                       </label>
+                      
+                      <input 
+                        type="file" 
+                        ref={vinFileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleVinPhotoSelect} 
+                      />
 
                       {vinPhotoPreviewUrl ? (
                         <div className="relative rounded-2xl border border-purple-500/40 bg-black/60 p-3 overflow-hidden flex flex-col items-center gap-3">
