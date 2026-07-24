@@ -518,7 +518,7 @@ Return ONLY a JSON array of strings. Example: ["181 л.с. / 133 кВт", "249 �
   }
 }
 
-export async function recognizeVinFromPhoto(base64Image: string, mimeType: string = 'image/jpeg'): Promise<string> {
+export async function recognizeVinFromPhoto(base64Image: string, mimeType: string = 'image/jpeg'): Promise<{ vin: string, brand?: string, model?: string, year?: string }> {
   const ai = getGeminiClient();
   const models = getEnabledModels();
 
@@ -529,17 +529,21 @@ export async function recognizeVinFromPhoto(base64Image: string, mimeType: strin
   // Strip data URL scheme prefix if present
   const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-  const promptText = `Проанализируй данное изображение (это может быть фото СТС/техпаспорта, маркировочной таблички под капотом, стойки кузова или VIN под лобовым стеклом).
-Найди VIN номер (Vehicle Identification Number, 17 символов) или номер кузова (для японских праворульных авто, например NZE141-1234567).
+  const promptText = `Проанализируй данное изображение (это может быть фото СТС/техпаспорта, маркировочной таблички под капотом, стойки кузова автомобиля или VIN под лобовым стеклом).
+Найди VIN номер (Vehicle Identification Number, 17 символов) или номер кузова/шасси (для японских праворульных авто, например NZE141-1234567, ZVW30-1234567).
+Также, если на фото (например в СТС) указаны марка, модель и год выпуска автомобиля, извлеки их.
 
 Верни СТРОГО JSON следующий вид:
 {
-  "vin": "НАЙДЕННЫЙ_VIN_ИЛИ_НОМЕР_КУЗОВА"
+  "vin": "НАЙДЕННЫЙ_VIN_ИЛИ_НОМЕР_КУЗОВА",
+  "brand": "МАРКА_АВТО (если найдена, иначе null)",
+  "model": "МОДЕЛЬ_АВТО (если найдена, иначе null)",
+  "year": "ГОД_ВЫПУСКА (если найден, иначе null)"
 }
-Если VIN код не найден или размыт, верни:
+Если VIN код или номер кузова не найден, верни:
 {
   "vin": null,
-  "reason": "Не удалось чётко разобрать VIN код на фото"
+  "reason": "Не удалось чётко разобрать VIN код или номер кузова на фото"
 }`;
 
   try {
@@ -569,7 +573,12 @@ export async function recognizeVinFromPhoto(base64Image: string, mimeType: strin
     if (parsed && parsed.vin && typeof parsed.vin === 'string') {
       const cleanVin = parsed.vin.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
       if (cleanVin.length >= 6) {
-        return cleanVin;
+        return {
+          vin: cleanVin,
+          brand: parsed.brand || undefined,
+          model: parsed.model || undefined,
+          year: parsed.year ? String(parsed.year) : undefined
+        };
       }
     }
 
@@ -577,7 +586,7 @@ export async function recognizeVinFromPhoto(base64Image: string, mimeType: strin
       throw new Error(parsed.reason);
     }
 
-    throw new Error('VIN код не обнаружен на изображении. Убедитесь, что фото чёткое и хорошо освещено.');
+    throw new Error('VIN код или номер кузова не обнаружен на изображении. Убедитесь, что фото чёткое и хорошо освещено.');
   } catch (error: any) {
     console.error('VIN Photo recognition failed:', error);
     throw new Error(error.message || 'Ошибка распознавания VIN с фотографии');
@@ -615,17 +624,23 @@ Return ONLY a JSON array of strings. Example: ["АКПП", "МКПП", "Вари
   }
 }
 
-export async function searchByVin(vin: string, mileage?: string, conditions?: string, power?: string, handDrive?: string, fuelType?: string, onStatusChange?: (status: string) => void): Promise<CarData> {
+export async function searchByVin(vin: string, mileage?: string, conditions?: string, power?: string, handDrive?: string, fuelType?: string, onStatusChange?: (status: string) => void, vehicleHintParam?: string): Promise<CarData> {
   const ai = getGeminiClient();
 
   onStatusChange?.('Поиск в каталоге...');
   
   // 1. Try Ravenol by VIN directly first (highest priority)
   let ravenolData = await fetchRavenolData(vin);
-  let vehicleHint: string | undefined;
+  let vehicleHint: string | undefined = vehicleHintParam;
+
+  // 1.5 If not found by VIN but we have a hint from photo, use it
+  if (!ravenolData && vehicleHint) {
+    onStatusChange?.(`Поиск технических данных...`);
+    ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
+  }
 
   // 2. If not found, try NHTSA Decoder
-  if (!ravenolData) {
+  if (!ravenolData && (!vehicleHint || vehicleHint.length < 5)) {
     onStatusChange?.('Идентификация автомобиля...');
     const vehicle = await decodeVin(vin);
     if (vehicle) {
@@ -636,7 +651,7 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
   }
 
   // 3. If still not found, try Gemini for a hint (neural network as last resort for decoding)
-  if (!ravenolData) {
+  if (!ravenolData && (!vehicleHint || vehicleHint.length < 5)) {
     onStatusChange?.('Интеллектуальный анализ VIN...');
     const geminiHint = await getGeminiVinHint(ai, vin);
     if (geminiHint) {

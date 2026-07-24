@@ -176,11 +176,18 @@ export default function Search() {
         }
 
         try {
-          const recognizedVin = await recognizeVinFromPhoto(base64, file.type);
+          const result = await recognizeVinFromPhoto(base64, file.type);
           if (isMounted.current) {
-            setVin(recognizedVin);
-            setVinPhotoSuccessMsg(`VIN успешно считан по фото: ${recognizedVin}`);
-            logUserAction('recognize_vin_photo', `Считан VIN с фото: ${recognizedVin}`);
+            setVin(result.vin);
+            if (result.brand) setBrand(result.brand);
+            if (result.model) setModel(result.model);
+            if (result.year) setYear(result.year);
+            
+            const extraInfo = [result.brand, result.model, result.year].filter(Boolean).join(' ');
+            const successMsg = `VIN/Кузов успешно считан: ${result.vin}${extraInfo ? ` (${extraInfo})` : ''}`;
+            
+            setVinPhotoSuccessMsg(successMsg);
+            logUserAction('recognize_vin_photo', `Считан VIN с фото: ${result.vin}`);
           }
         } catch (err: any) {
           if (isMounted.current) {
@@ -285,8 +292,8 @@ export default function Search() {
   };
 
   const handleVinSearch = async () => {
-    if (!vin || vin.length < 10) {
-      setVinError('Введите корректный VIN код (минимум 10 символов)');
+    if (!vin || vin.length < 6) {
+      setVinError('Введите корректный VIN код или номер кузова');
       return;
     }
     
@@ -310,9 +317,12 @@ export default function Search() {
     });
     
     try {
+      const hintParts = [brand, model, year].filter(Boolean);
+      const vehicleHintParam = hintParts.length > 0 ? hintParts.join(' ') : undefined;
+
       const carData = await searchByVin(vin, mileage, conditions, power, handDrive, fuelType, (status) => {
         if (isMounted.current) setSearchStatus(status);
-      });
+      }, vehicleHintParam);
       
       recordSearch();
       addDynamicCar(carData);
@@ -977,6 +987,7 @@ export default function Search() {
                       </label>
                       
                       <input 
+                        id="vin-photo-input"
                         type="file" 
                         ref={vinFileInputRef} 
                         className="hidden" 
@@ -992,16 +1003,13 @@ export default function Search() {
                             className="max-h-56 w-auto object-contain rounded-xl border border-white/10 shadow-md" 
                           />
                           <div className="flex items-center gap-2 w-full">
-                            <Button
-                              type="button"
-                              onClick={() => vinFileInputRef.current?.click()}
-                              disabled={isScanningVinPhoto}
-                              variant="outline"
-                              className="flex-1 h-10 text-xs font-bold rounded-xl border-purple-500/40 bg-purple-900/30 text-purple-200 hover:bg-purple-800/40"
+                            <label
+                              htmlFor="vin-photo-input"
+                              className={`flex-1 h-10 text-xs font-bold rounded-xl border border-purple-500/40 bg-purple-900/30 text-purple-200 hover:bg-purple-800/40 flex items-center justify-center cursor-pointer transition-colors ${isScanningVinPhoto ? 'opacity-50 pointer-events-none' : ''}`}
                             >
                               <Camera size={14} className="mr-1.5 text-amber-400" />
                               Загрузить другое фото
-                            </Button>
+                            </label>
                             <Button
                               type="button"
                               onClick={() => {
@@ -1017,8 +1025,8 @@ export default function Search() {
                           </div>
                         </div>
                       ) : (
-                        <div 
-                          onClick={() => vinFileInputRef.current?.click()}
+                        <label 
+                          htmlFor="vin-photo-input"
                           className="border-2 border-dashed border-purple-500/40 hover:border-purple-400 bg-purple-950/20 hover:bg-purple-900/30 rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group"
                         >
                           <div className="w-14 h-14 rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -1032,7 +1040,7 @@ export default function Search() {
                               Поддерживаются JPG, PNG, WEBP (СТС, шильдик, кузов)
                             </p>
                           </div>
-                        </div>
+                        </label>
                       )}
 
                       <Button
