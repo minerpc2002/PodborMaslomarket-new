@@ -529,18 +529,26 @@ export async function recognizeVinFromPhoto(base64Image: string, mimeType: strin
   // Strip data URL scheme prefix if present
   const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-  const promptText = `Проанализируй данное изображение (это может быть фото СТС/техпаспорта, маркировочной таблички под капотом, стойки кузова автомобиля или VIN под лобовым стеклом).
-Найди VIN номер (Vehicle Identification Number, 17 символов) или номер кузова/шасси (для японских праворульных авто, например NZE141-1234567, ZVW30-1234567).
-Также, если на фото (например в СТС) указаны марка, модель и год выпуска автомобиля, извлеки их.
+  const promptText = `Проанализируй данное изображение СТС/ПТС (свидетельства о регистрации ТС) или маркировочной таблички автомобиля.
+Твоя задача — максимально точно и без ошибок извлечь следующие данные:
+
+1. VIN номер или Номер кузова/шасси. 
+   - Внимательно посмотри в поля "Идентификационный номер (VIN)", "Кузов (кабина, прицеп) №", или "Шасси (рама) №".
+   - Для японских авто номер кузова обычно имеет формат БУКВЫЦИФРЫ-ЦИФРЫ (например LA150S-0071790, M110A-005337). 
+   - ВАЖНО: Перепиши номер кузова/VIN СИМВОЛ В СИМВОЛ, включая дефисы, если они есть. Если в документе номер написан слитно (например M110A005337), перепиши слитно. Ошибаться нельзя.
+2. Марка (Brand) и Модель (Model).
+   - Извлеки марку и точную модель из поля "Марка, модель" или "Марка" / "Модель".
+   - Если указана модификация (например, Custom, Conte, Spacia Custom), обязательно включи её в название модели! Не сокращай название.
+3. Год выпуска.
 
 Верни СТРОГО JSON следующий вид:
 {
-  "vin": "НАЙДЕННЫЙ_VIN_ИЛИ_НОМЕР_КУЗОВА",
-  "brand": "МАРКА_АВТО (если найдена, иначе null)",
-  "model": "МОДЕЛЬ_АВТО (если найдена, иначе null)",
-  "year": "ГОД_ВЫПУСКА (если найден, иначе null)"
+  "vin": "ТОЧНЫЙ_VIN_ИЛИ_НОМЕР_КУЗОВА",
+  "brand": "МАРКА_АВТО",
+  "model": "ПОЛНАЯ_МОДЕЛЬ_АВТО (включая все слова, например Move Custom)",
+  "year": "ГОД_ВЫПУСКА"
 }
-Если VIN код или номер кузова не найден, верни:
+Если VIN или номер кузова/шасси вообще отсутствует или нечитаем, верни:
 {
   "vin": null,
   "reason": "Не удалось чётко разобрать VIN код или номер кузова на фото"
@@ -632,6 +640,25 @@ export async function searchByVin(vin: string, mileage?: string, conditions?: st
   // 1. Try Ravenol by VIN directly first (highest priority)
   let ravenolData = await fetchRavenolData(vin);
   let vehicleHint: string | undefined = vehicleHintParam;
+
+  // 1.2 If VIN looks like a JDM chassis (with or without hyphen), extract the chassis code
+  if (!ravenolData) {
+    let chassisCode = '';
+    if (vin.includes('-')) {
+      chassisCode = vin.split('-')[0];
+    } else {
+      // e.g. M110A005337 -> M110A
+      const jdmMatch = vin.match(/^([A-Z0-9]{3,6})[0-9]{6,7}$/);
+      if (jdmMatch) {
+        chassisCode = jdmMatch[1];
+      }
+    }
+    
+    if (chassisCode.length >= 3) {
+      onStatusChange?.('Поиск по коду кузова...');
+      ravenolData = await fetchRavenolData(chassisCode, vehicleHint);
+    }
+  }
 
   // 1.5 If not found by VIN but we have a hint from photo, use it
   if (!ravenolData && vehicleHint) {
