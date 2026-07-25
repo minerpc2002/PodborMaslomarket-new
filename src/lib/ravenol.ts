@@ -115,21 +115,33 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
       const parser = new DOMParser();
       const doc = parser.parseFromString(carHtml, 'text/html');
       
-      // Remove product_parameters to reduce size
-      const params = doc.querySelectorAll('.product_parameters');
-      params.forEach(p => p.parentNode?.removeChild(p));
+      const titleEl = doc.querySelector('title');
+      if (titleEl) title = titleEl.textContent?.replace(/\s+/g, ' ').trim() || '';
       
-      title = doc.querySelector('.ravwidg-car-title')?.textContent || doc.querySelector('h1')?.textContent || '';
-      content = doc.body?.innerText || doc.body?.textContent || '';
+      const nodes = doc.querySelectorAll('.aggregate_node_wrapp');
+      content = Array.from(nodes).map(node => {
+        const h4 = node.querySelector('.aggregate_node_title');
+        const unitName = h4 ? (h4.textContent || '').replace(/\s+/g, ' ').trim() : 'Unknown Unit';
+        const products = Array.from(node.querySelectorAll('.node_product_item_title_wrapp')).map(p => {
+          const link = p.querySelector('a');
+          return link ? (link.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        }).filter(Boolean);
+        return `${unitName}\n${products.join('\n')}`;
+      }).join('\n\n');
     } else {
-      let cleanHtml = carHtml.replace(/<script[\s\S]*?<\/script>/gi, '')
-                               .replace(/<style[\s\S]*?<\/style>/gi, '');
-      // Remove product_parameters div blocks to vastly reduce token size
-      cleanHtml = cleanHtml.replace(/<div[^>]*class="[^"]*product_parameters[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi, "");
+      const titleMatch = carHtml.match(/<title>([\s\S]*?)<\/title>/i);
+      title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : '';
       
-      const titleMatch = cleanHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || cleanHtml.match(/class="ravwidg-car-title"[^>]*>([\s\S]*?)<\/div>/i);
-      if (titleMatch) title = titleMatch[1].replace(/<[^>]*>/g, '').trim();
-      content = cleanHtml.replace(/<[^>]+>/g, ' ');
+      // Node fallback for regex extraction
+      const nodeMatches = [...carHtml.matchAll(/<div class="aggregate_node_wrapp"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi)];
+      content = nodeMatches.map(m => {
+        const block = m[1];
+        const h4Match = block.match(/<h4 class="aggregate_node_title"[^>]*>([\s\S]*?)<\/h4>/i);
+        const unitName = h4Match ? h4Match[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : 'Unknown';
+        const productMatches = [...block.matchAll(/<div class="node_product_item_title_wrapp"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/gi)];
+        const products = productMatches.map(pm => pm[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
+        return `${unitName}\n${products.join('\n')}`;
+      }).join('\n\n');
     }
 
     // Clean up excessive whitespace
