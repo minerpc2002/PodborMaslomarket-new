@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Search, ScanLine, ArrowRight, Sparkles, Camera } from 'lucide-react';
+import { Search, ArrowRight, Sparkles, Camera } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { motion } from 'motion/react';
 import { useAppStore } from '../store/useAppStore';
@@ -44,9 +44,6 @@ export default function Home() {
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-800/60 to-zinc-900/60 backdrop-blur-xl border border-white/10 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-blue-500/10">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 animate-pulse opacity-50" />
               <div className="relative bg-black/40 rounded-[23px] p-6 text-white overflow-hidden">
-                <div className="absolute -right-6 -top-6 opacity-10 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-700">
-                  <ScanLine size={120} strokeWidth={1} />
-                </div>
                 
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
