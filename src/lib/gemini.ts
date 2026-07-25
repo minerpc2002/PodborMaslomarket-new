@@ -376,7 +376,7 @@ async function callGeminiWithRetry(ai: any, params: any, retries = 3): Promise<a
   }
 }
 
-async function getGeminiVinHint(ai: any, vin: string): Promise<{ hint: string; searchTerms: string[] } | null> {
+async function getGeminiVinHint(ai: any, vin: string): Promise<{ hint: string; searchTerms: string[]; brand?: string } | null> {
   try {
     const prompt = `You are an expert automotive VIN and Chassis decoder for ALL world vehicles.
 Analyze this VIN / Frame / Chassis number: ${vin}.
@@ -393,9 +393,9 @@ Identify:
 4. Exact Chassis or Model code (e.g. F30, 8K2, ZRT260, NT32, G4FG, 205.077, SJ5)
 5. Generate an array of search_terms specifically formatted to match how the oil catalog (podbor.ravenol.ru) indexes vehicles.
 Include:
-- Model/Chassis code (e.g. "205.077", "F30", "8K2", "ZRT260", "NT32", "SJ5")
 - Brand + Model + Chassis (e.g. "BMW F30 320i", "Audi A4 8K", "Toyota Allion ZRT260", "Nissan X-Trail T32", "Peugeot 308 T9")
 - Model + Chassis / Engine (e.g. "320i F30", "308 T9", "Forester 2.0 SJ", "A4 B8 2.0")
+- Chassis code ONLY if it is highly unique and at least 4 characters long (e.g. "205.077", "ZRT260"). DO NOT include short chassis codes like "T9", "8K", "F30" by themselves as they match too many random vehicles!
 
 Return ONLY JSON in this format:
 {
@@ -422,11 +422,12 @@ Return ONLY JSON in this format:
 
     const vehicleHint = parsed.vehicle_hint || `${parsed.brand || ''} ${parsed.model || ''} ${parsed.chassis || ''} ${parsed.model_code || ''}`.trim();
     const searchTerms: string[] = Array.isArray(parsed.search_terms) ? parsed.search_terms : [];
-    if (parsed.model_code) searchTerms.unshift(parsed.model_code);
+    if (parsed.model_code && parsed.model_code.length >= 4) searchTerms.unshift(parsed.model_code);
 
     return {
       hint: vehicleHint,
-      searchTerms: Array.from(new Set(searchTerms)).filter(Boolean)
+      searchTerms: Array.from(new Set(searchTerms)).filter(t => t && t.length > 2),
+      brand: parsed.brand
     };
   } catch (e) {
     return null;
@@ -741,7 +742,7 @@ export async function searchByVin(
       vehicleHint = vehicleHint || geminiResult.hint;
       for (const term of geminiResult.searchTerms) {
         onStatusChange?.(`Поиск технических данных (${term})...`);
-        ravenolData = await fetchRavenolData(term, vehicleHint);
+        ravenolData = await fetchRavenolData(term, vehicleHint, geminiResult.brand);
         if (ravenolData) break;
       }
     }
@@ -754,7 +755,7 @@ export async function searchByVin(
     if (vehicle && vehicle.make) {
       vehicleHint = `${vehicle.make} ${vehicle.model} ${vehicle.year}`.trim();
       onStatusChange?.(`Поиск технических данных...`);
-      ravenolData = await fetchRavenolData(vehicleHint, vehicleHint);
+      ravenolData = await fetchRavenolData(vehicleHint, vehicleHint, vehicle.make);
     }
   }
 
@@ -846,14 +847,14 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
   const carHint = `${brand} ${model} ${body || ''} ${engine || ''}`.trim();
   
   onStatusChange?.('Поиск технических данных...');
-  let ravenolData = await fetchRavenolData(query, carHint);
+  let ravenolData = await fetchRavenolData(query, carHint, brand);
 
   // Fallback 1: Brand + Model + Body/Generation
   if (!ravenolData && (year || body || engine)) {
     onStatusChange?.('Уточнение параметров...');
     const simplerQuery = `${brand} ${model} ${body || ''}`.trim();
     if (simplerQuery !== query) {
-      ravenolData = await fetchRavenolData(simplerQuery, carHint);
+      ravenolData = await fetchRavenolData(simplerQuery, carHint, brand);
     }
   }
 
@@ -861,7 +862,7 @@ export async function searchByCarDetails(brand: string, model: string, year?: st
   if (!ravenolData) {
     const basicQuery = `${brand} ${model}`.trim();
     if (basicQuery !== query && basicQuery !== `${brand} ${model} ${body || ''}`.trim()) {
-      ravenolData = await fetchRavenolData(basicQuery, carHint);
+      ravenolData = await fetchRavenolData(basicQuery, carHint, brand);
     }
   }
 

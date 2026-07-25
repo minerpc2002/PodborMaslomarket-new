@@ -11,7 +11,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
   }
 };
 
-export async function fetchRavenolData(query: string, hint?: string): Promise<string | null> {
+export async function fetchRavenolData(query: string, hint?: string, brand?: string): Promise<string | null> {
   try {
     // 1. Search for the query (VIN or car details)
     const searchUrl = `https://podbor.ravenol.ru/search/?q=${encodeURIComponent(query)}`;
@@ -45,6 +45,7 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
       const candidates: { href: string; text: string; score: number }[] = [];
 
       const hintTokens = hint ? hint.toLowerCase().split(/[\s,.-]+/).filter(t => t.length > 1) : [];
+      const brandToken = brand ? brand.toLowerCase().split(/[\s,.-]+/)[0] : null;
 
       for (const m of linkMatches) {
         const href = m[1];
@@ -53,6 +54,22 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
         // Skip top-level category pages and non-car sections
         if (href.match(/^\/(1-cars|3-moto|4-trucks|5-agro|6-industrial|7-marine|8-oldtimer|2-favorites)\/?$/i)) {
           continue;
+        }
+
+        const lowerText = text.toLowerCase();
+        const lowerHref = href.toLowerCase();
+
+        // STRICT BRAND FILTERING: If we know the brand, skip candidates that don't match it in the href
+        // The href usually looks like /1-cars/396-nissan/1620-micra...
+        if (brandToken && href.startsWith('/1-cars/')) {
+           const brandPartMatch = href.match(/^\/1-cars\/\d+-([^\/]+)/);
+           if (brandPartMatch) {
+             const hrefBrand = brandPartMatch[1].toLowerCase();
+             // Simple contains check, e.g. "mercedes-benz" contains "mercedes"
+             if (!hrefBrand.includes(brandToken) && !brandToken.includes(hrefBrand)) {
+               continue; // Skip! Wrong brand entirely
+             }
+           }
         }
 
         const slashCount = (href.match(/\//g) || []).length;
@@ -66,8 +83,6 @@ export async function fetchRavenolData(query: string, hint?: string): Promise<st
 
         // Reward if link text or href contains hint tokens
         if (hintTokens.length > 0) {
-          const lowerText = text.toLowerCase();
-          const lowerHref = href.toLowerCase();
           for (const token of hintTokens) {
             if (lowerText.includes(token) || lowerHref.includes(token)) {
               score += 30;

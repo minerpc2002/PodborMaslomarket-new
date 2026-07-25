@@ -127,7 +127,8 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if true;
       allow update: if (settingId == 'ai_usage' && isAuthenticated()) || isAdmin();
-      allow create, delete: if isAdmin();
+      allow create: if (settingId == 'ai_usage' && isAuthenticated()) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /support_messages/{messageId} {
