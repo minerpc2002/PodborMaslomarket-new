@@ -28,7 +28,8 @@ export const defaultPrompts = {
 {{RAVENOL_DATA}}
 </technical_data>
 3. MANDATORY TASK: 
-   - You MUST identify the car based on the <technical_data>. HOWEVER, if the {{VEHICLE_HINT_SECTION}} or the {{VIN}} provides a more specific model name (e.g. "Move Custom" instead of "Move") or a more specific chassis code (e.g. "M110A" instead of "M100"), you MUST use the specific name and chassis from the hint or VIN for the final "brand" and "model" fields.
+   - You MUST extract the exact brand, model, and generation (chassis code) from the <technical_data> title. The <technical_data> is the absolute source of truth.
+   - DO NOT override the base model or generation with the hint or VIN. You may only use {{VEHICLE_HINT_SECTION}} to clarify the engine or trim if it is completely missing from the <technical_data>.
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 4. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.
@@ -79,7 +80,8 @@ Vehicle: {{QUERY}}.
 {{RAVENOL_DATA}}
 </technical_data>
 2. MANDATORY TASK: 
-   - You MUST identify the car based on the <technical_data>. HOWEVER, if the original QUERY provides a more specific model name (e.g. "Move Custom" instead of "Move") or a more specific chassis code (e.g. "M110A" instead of "M100"), you MUST use the specific name and chassis from the QUERY for the final "brand" and "model" fields.
+   - You MUST extract the exact brand, model, and generation (chassis code) from the <technical_data> title. The <technical_data> is the absolute source of truth.
+   - DO NOT override the base model or generation with the original QUERY. You may only use the QUERY to clarify the engine or trim if it is completely missing from the <technical_data>.
    - Extract ALL exact volumes, ALL OEM specifications, ALL factory viscosities, and ALL technical notes/information from the <technical_data>.
 3. RECOMMENDATIONS & RULES:
    - Provide recommendations strictly based on the factory data.

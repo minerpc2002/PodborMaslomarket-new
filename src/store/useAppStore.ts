@@ -197,9 +197,9 @@ export const useAppStore = create<AppState>()(
         aiTemperature: state.aiTemperature,
         aiPrompts: state.aiPrompts
       }),
-      version: 7,
+      version: 8,
       migrate: (persistedState: any, version: number) => {
-        if (version < 6) {
+        if (version < 8) {
           // Force reset prompts to defaults to apply prompt improvements
           persistedState.aiPrompts = defaultPrompts;
         }
