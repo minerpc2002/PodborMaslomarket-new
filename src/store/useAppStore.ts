@@ -67,8 +67,12 @@ export const useAppStore = create<AppState>()(
       authError: null,
       isAiSearchEnabled: true,
       aiModelsConfig: [
-        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', enabled: true, priority: 1 },
-        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 2 }
+        { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', enabled: true, priority: 1 },
+        { id: 'gemini-3.1-flash-preview', name: 'Gemini 3.1 Flash', enabled: true, priority: 2 },
+        { id: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash', enabled: true, priority: 3 },
+        { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', enabled: true, priority: 4 },
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', enabled: true, priority: 5 },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 6 }
       ],
       isSnowfallEnabled: false,
       aiTemperature: 0.4,
@@ -193,16 +197,20 @@ export const useAppStore = create<AppState>()(
         aiTemperature: state.aiTemperature,
         aiPrompts: state.aiPrompts
       }),
-      version: 6,
+      version: 7,
       migrate: (persistedState: any, version: number) => {
         if (version < 6) {
           // Force reset prompts to defaults to apply prompt improvements
           persistedState.aiPrompts = defaultPrompts;
         }
-        if (version < 5) {
+        if (version < 7) {
           persistedState.aiModelsConfig = [
-            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', enabled: true, priority: 1 },
-            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 2 }
+            { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', enabled: true, priority: 1 },
+            { id: 'gemini-3.1-flash-preview', name: 'Gemini 3.1 Flash', enabled: true, priority: 2 },
+            { id: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash', enabled: true, priority: 3 },
+            { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite', enabled: true, priority: 4 },
+            { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', enabled: true, priority: 5 },
+            { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', enabled: true, priority: 6 }
           ];
         }
         return persistedState;

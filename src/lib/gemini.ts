@@ -160,6 +160,10 @@ function getEnabledModels(): string[] {
   
   // Default fallback
   return [
+    'gemini-3.1-pro-preview',
+    'gemini-3.1-flash-preview',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite-preview',
     'gemini-2.5-pro',
     'gemini-2.5-flash'
   ];
@@ -197,7 +201,7 @@ async function callOpenRouter(prompt: string, schema?: any): Promise<any> {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": window.location.origin,
+          "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
           "X-Title": "Oil Selector App",
           "Content-Type": "application/json"
         },
