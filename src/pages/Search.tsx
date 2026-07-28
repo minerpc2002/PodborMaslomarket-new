@@ -12,6 +12,7 @@ import { logUserAction } from '../lib/logger';
 import { motion, AnimatePresence } from 'motion/react';
 import { v4 as uuidv4 } from 'uuid';
 import SearchProgressBar from '../components/SearchProgressBar';
+import { updateQuestProgress } from '../lib/quests';
 
 const POPULAR_BRANDS = [
   'Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru', 'Mitsubishi', 'Suzuki', 'Lexus', 'Infiniti', 'Acura',
@@ -256,6 +257,10 @@ export default function Search() {
       addToHistory(carData, !isMounted.current);
       logUserAction('search_manual', `Поиск по авто: ${brand} ${model} ${year} ${body} ${engine} ${transmission}`);
       
+      if (userProfile?.uid) {
+        updateQuestProgress(userProfile.uid, 'searches', 1);
+      }
+      
       if (isMounted.current) {
         navigate(`/result/${carData.id}`);
       } else {
@@ -328,6 +333,10 @@ export default function Search() {
       addDynamicCar(carData);
       addToHistory(carData, !isMounted.current);
       logUserAction('search_vin', `Поиск по VIN: ${vin}`);
+      
+      if (userProfile?.uid) {
+        updateQuestProgress(userProfile.uid, 'searches', 1);
+      }
       
       if (isMounted.current) {
         navigate(`/result/${carData.id}`);

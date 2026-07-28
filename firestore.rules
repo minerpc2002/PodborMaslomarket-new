@@ -88,7 +88,9 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isStaff();
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data, userId) && 
                     (request.resource.data.role == 'user' || (request.resource.data.role == 'admin' && request.auth.token.email != null && request.auth.token.email.lower() == "minerpc2002@gmail.com" && request.auth.token.email_verified == true)) && 
-                    (!('activePromoCode' in request.resource.data) || request.resource.data.activePromoCode == null || (
+                    (!('activePromoCode' in request.resource.data) || request.resource.data.activePromoCode == null || 
+                     (request.resource.data.activePromoCode.createdBy == 'system' && request.resource.data.activePromoCode.code.matches('^QUEST_.*')) ||
+                    (
                       get(/databases/$(database)/documents/promocodes/$(request.resource.data.activePromoCode.code)).data.expiresAt > request.time.toMillis()
                     ));
       allow update: if isAuthenticated() && (
@@ -97,6 +99,7 @@ service cloud.firestore {
          (!('activePromoCode' in request.resource.data) || 
           request.resource.data.activePromoCode == null || 
           ('activePromoCode' in resource.data && request.resource.data.activePromoCode == resource.data.activePromoCode) ||
+          (request.resource.data.activePromoCode.createdBy == 'system' && request.resource.data.activePromoCode.code.matches('^QUEST_.*')) ||
           get(/databases/$(database)/documents/promocodes/$(request.resource.data.activePromoCode.code)).data.expiresAt > request.time.toMillis()
          ) &&
          isValidUser(request.resource.data, userId)) ||
@@ -118,6 +121,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /quests/{questId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isStaff();
+    }
+    
     match /user_logs/{logId} {
       allow read: if isStaff();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && request.resource.data.keys().hasAll(['userId', 'action', 'timestamp']);

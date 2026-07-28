@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { 
   X, LogOut, Gift, User, ShieldCheck, AlertCircle, Crown, Sparkles, 
-  History, Heart, LayoutDashboard, Copy, Check, Zap, ChevronRight, Clock, Shield, Loader2
+  History, Heart, LayoutDashboard, Copy, Check, Zap, ChevronRight, Clock, Shield, Loader2, Target
 } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
@@ -16,9 +16,10 @@ interface UserMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenPromo: () => void;
+  onOpenQuests: () => void;
 }
 
-export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenuModalProps) {
+export default function UserMenuModal({ isOpen, onClose, onOpenPromo, onOpenQuests }: UserMenuModalProps) {
   const navigate = useNavigate();
   const { userProfile, setUserProfile, activePromoCode, setActivePromoCode, history, favorites, getSearchStatus } = useAppStore();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
@@ -29,6 +30,9 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
     if (!isOpen) {
       setShowConfirmLogout(false);
       setIsLoggingOut(false);
+      document.body.style.overflow = '';
+    } else {
+      document.body.style.overflow = 'hidden';
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,7 +44,10 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown);
     }
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -91,7 +98,7 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 overflow-y-auto cursor-pointer"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 overflow-hidden cursor-pointer touch-none"
     >
       <motion.div
         onClick={(e) => e.stopPropagation()}
@@ -99,9 +106,9 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="w-full max-w-sm my-auto cursor-default max-h-[90vh] flex flex-col"
+        className="w-full max-w-sm my-auto cursor-default max-h-[90vh] flex flex-col touch-none"
       >
-        <Card className="border border-white/10 shadow-2xl relative overflow-y-auto max-h-[88vh] sm:max-h-[90vh] liquid-glass-heavy rounded-3xl custom-scrollbar flex flex-col">
+        <Card className="border border-white/10 shadow-2xl relative overflow-hidden max-h-[88vh] sm:max-h-[90vh] liquid-glass-heavy rounded-3xl flex flex-col touch-none">
           {/* Ambient Background Lights */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -121,15 +128,15 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
           </button>
 
           <CardHeader className="pb-2 pt-5 sm:pt-6 text-center relative z-10 shrink-0">
-            {/* Avatar section with animated status ring */}
+            {/* Avatar section with status ring */}
             <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 mb-2 sm:mb-3">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full blur-md opacity-40 animate-pulse" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full blur-md opacity-30" />
               <div className={cn(
                 "relative w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full p-0.5",
                 userProfile?.role === 'admin' 
                   ? "bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500" 
                   : isPromoActive 
-                    ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-cyan-400 animate-spin-slow"
+                    ? "bg-gradient-to-tr from-purple-500 via-pink-500 to-cyan-400"
                     : "bg-gradient-to-tr from-blue-500 to-indigo-500"
               )}>
                 <img 
@@ -260,6 +267,23 @@ export default function UserMenuModal({ isOpen, onClose, onOpenPromo }: UserMenu
                   <ChevronRight size={14} className="opacity-60" />
                 </Button>
               )}
+
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between h-10 sm:h-11 px-3 rounded-xl hover:bg-white/5 text-zinc-200 transition-all"
+                onClick={() => {
+                  onClose();
+                  onOpenQuests();
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-blue-500/20 rounded-lg text-blue-400">
+                    <Target size={16} />
+                  </div>
+                  <span className="text-xs font-bold">Задания и награды</span>
+                </div>
+                <ChevronRight size={14} className="opacity-60" />
+              </Button>
 
               <Button 
                 variant="ghost" 

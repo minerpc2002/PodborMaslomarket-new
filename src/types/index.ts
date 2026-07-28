@@ -67,6 +67,30 @@ export interface SupportBan {
   bannedAt: number;
 }
 
+export type QuestType = 'registration' | 'searches' | 'daily_logins' | 'custom';
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  type: QuestType;
+  targetCount: number;
+  rewardDays: number;
+  rewardSearches: number;
+  isActive: boolean;
+  order: number;
+  createdAt: number;
+}
+
+export interface UserQuestProgress {
+  questId: string;
+  progress: number;
+  completedAt?: number;
+  rewardClaimedAt?: number;
+  lastLoginDate?: string; // Used for daily_logins
+  loginDates?: string[]; // Used for daily_logins
+}
+
 export interface UserProfile {
   uid: string;
   nickname: string;
@@ -76,6 +100,7 @@ export interface UserProfile {
   activePromoCode?: PromoCode | null;
   activatedPromoCodes?: string[];
   supportBan?: SupportBan | null;
+  quests?: Record<string, UserQuestProgress>;
 }
 
 export interface PromoCode {

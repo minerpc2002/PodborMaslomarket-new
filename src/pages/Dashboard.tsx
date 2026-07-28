@@ -7,8 +7,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle, Clock, Wrench } from 'lucide-react';
+import { Users, Ticket, Plus, Trash2, Shield, ShieldAlert, ShieldCheck, Loader2, User, Search, Crown, Cpu, Power, MessageSquare, Send, Activity, X, Sparkles, ChevronUp, ChevronDown, Check, X as XIcon, RotateCcw, Wand2, AlertCircle, Clock, Wrench, Target } from 'lucide-react';
 import UserAdminModal from '../components/UserAdminModal';
+import QuestsAdmin from '../components/QuestsAdmin';
 import { auth, db } from '../firebase';
 import { MaintenanceConfig } from '../types';
 
@@ -835,22 +836,26 @@ Return ONLY the updated prompt text, no explanations.`;
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="bg-zinc-900/40 p-1 border border-white/5 backdrop-blur-xl rounded-2xl flex w-full sm:w-auto overflow-x-auto no-scrollbar justify-start">
-          <TabsTrigger value="profile" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+        <TabsList className="bg-zinc-900/40 p-1 border border-white/5 backdrop-blur-xl rounded-2xl flex w-full overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar justify-start">
+          <TabsTrigger value="profile" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
             <User size={18} />
             <span>Профиль</span>
           </TabsTrigger>
           {isStaff && (
             <>
-              <TabsTrigger value="users" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+              <TabsTrigger value="users" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
                 <Users size={18} />
                 <span>Пользователи ({users.length})</span>
               </TabsTrigger>
-              <TabsTrigger value="promo" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+              <TabsTrigger value="quests" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
+                <Target size={18} />
+                <span>Квесты</span>
+              </TabsTrigger>
+              <TabsTrigger value="promo" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
                 <Ticket size={18} />
                 <span>Промокоды</span>
               </TabsTrigger>
-                          <TabsTrigger value="support" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap relative">
+                          <TabsTrigger value="support" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px] relative">
                 <MessageSquare size={18} />
                 <span>Поддержка</span>
                 {Object.values(supportChats).some((c: SupportChat) => c.status === 'open') && (
@@ -859,11 +864,11 @@ Return ONLY the updated prompt text, no explanations.`;
               </TabsTrigger>
               {isAdmin && (
                 <>
-                  <TabsTrigger value="ai_settings" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+                  <TabsTrigger value="ai_settings" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
                     <Cpu size={18} />
                     <span>Настройки ИИ</span>
                   </TabsTrigger>
-                  <TabsTrigger value="ai_prompts" className="flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap">
+                  <TabsTrigger value="ai_prompts" className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all whitespace-nowrap min-w-min sm:min-w-[120px]">
                     <MessageSquare size={18} />
                     <span>Промпты</span>
                   </TabsTrigger>
@@ -1043,6 +1048,10 @@ Return ONLY the updated prompt text, no explanations.`;
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="quests" className="space-y-6">
+              <QuestsAdmin />
             </TabsContent>
 
             <TabsContent value="promo" className="space-y-6">

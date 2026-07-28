@@ -9,8 +9,9 @@ import Layout from './components/Layout';
 import { useAppStore } from './store/useAppStore';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection } from 'firebase/firestore';
 import { UserProfile } from './types';
+import { updateQuestProgress } from './lib/quests';
 
 // Lazy load pages
 const Home = lazy(() => import('./pages/Home'));
@@ -45,6 +46,30 @@ export default function App() {
       }
     });
 
+    // Listen for newly added quests to notify users
+    let isQuestsInitial = true;
+    const unsubQuests = onSnapshot(collection(db, 'quests'), (snapshot) => {
+      if (isQuestsInitial) {
+        isQuestsInitial = false;
+        return;
+      }
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const questData = change.doc.data();
+          if (questData.isActive) {
+            useAppStore.getState().addNotification({
+              id: `new_quest_${change.doc.id}_${Date.now()}`,
+              title: '🎯 Доступно новое задание!',
+              message: `Появилось задание: "${questData.title}". Выполните его, чтобы получить награду!`,
+              type: 'info',
+              createdAt: Date.now()
+            });
+          }
+        }
+      });
+    });
+
     let unsubscribeDoc: (() => void) | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -55,6 +80,13 @@ export default function App() {
 
       if (user) {
         setAuthError(null);
+        
+        // Track daily login
+        if (!(window as any).dailyLoginTracked) {
+          (window as any).dailyLoginTracked = true;
+          updateQuestProgress(user.uid, 'daily_logins');
+        }
+        
         unsubscribeDoc = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
           if (userDoc.exists()) {
             const profile = userDoc.data() as UserProfile;
@@ -89,6 +121,7 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
       unsubSettings();
+      unsubQuests();
     };
   }, [setUserProfile, setAuthReady, setAuthError, setIsAiSearchEnabled]);
 

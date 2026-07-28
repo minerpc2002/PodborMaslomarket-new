@@ -7,6 +7,7 @@ import { setupTelegram } from '../lib/telegram';
 import AuthModal from './AuthModal';
 import UserMenuModal from './UserMenuModal';
 import PromoModal from './PromoModal';
+import UserQuestsModal from './UserQuestsModal';
 import { auth } from '../firebase';
 import FAQModal from './FAQModal';
 import HowItWorksModal from './HowItWorksModal';
@@ -29,6 +30,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const { userProfile, activePromoCode, activeSearches, history, maintenanceConfig } = useAppStore();
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [isQuestsModalOpen, setIsQuestsModalOpen] = useState(false);
   const [isFAQModalOpen, setIsFAQModalOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -67,8 +69,10 @@ export default function Layout() {
         isOpen={isUserMenuOpen} 
         onClose={() => setIsUserMenuOpen(false)} 
         onOpenPromo={() => setIsPromoModalOpen(true)}
+        onOpenQuests={() => setIsQuestsModalOpen(true)}
       />
       <PromoModal isOpen={isPromoModalOpen} onClose={() => setIsPromoModalOpen(false)} />
+      <UserQuestsModal isOpen={isQuestsModalOpen} onClose={() => setIsQuestsModalOpen(false)} />
       <FAQModal isOpen={isFAQModalOpen} onClose={() => setIsFAQModalOpen(false)} />
       <HowItWorksModal isOpen={isHowItWorksOpen} onClose={() => setIsHowItWorksOpen(false)} />
       <SupportChatModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
@@ -107,86 +111,74 @@ export default function Layout() {
         className="sticky top-0 z-50 w-full liquid-glass border-b border-white/5 shadow-xl"
       >
         <div className="flex h-16 items-center justify-between px-4 sm:px-6 max-w-md mx-auto w-full">
-          <Link to="/" className="flex items-center gap-2 font-display font-bold text-sm tracking-tight shrink-0">
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-blue-500/50 shadow-lg shadow-blue-500/20 bg-zinc-900 flex items-center justify-center"
-            >
+          <Link to="/" className="flex items-center gap-2 font-display font-bold text-sm tracking-tight shrink-0 group">
+            <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-blue-500/50 bg-zinc-900 flex items-center justify-center shrink-0">
               {/* Fallback icon if logo.png is missing */}
               <Search size={16} strokeWidth={2.5} className="text-blue-500 absolute z-0" />
-              {/* New logo from user */}
+              {/* Logo image */}
               <img 
                 src="/logo.png" 
                 alt="Logo" 
                 className="w-full h-full object-cover relative z-10"
                 onError={(e) => (e.currentTarget.style.display = 'none')}
               />
-            </motion.div>
+            </div>
             <div className="flex flex-col leading-none">
-              <span className="text-zinc-50 text-[13px]">MasloMarket</span>
-              <span className="text-[8px] uppercase tracking-widest mt-0.5 font-black">
-                ПОДБОР <span className="shimmer-ai">AI</span>
+              <span className="text-zinc-50 text-[13px] group-hover:text-blue-400 transition-colors">MasloMarket</span>
+              <span className="text-[8px] uppercase tracking-widest mt-0.5 font-black text-blue-400">
+                ПОДБОР AI
               </span>
             </div>
           </Link>
           
           <div className="flex items-center gap-1 shrink-0">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+            <button
+              type="button"
               onClick={() => setIsSupportModalOpen(true)}
-              className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+              className="p-2 text-zinc-400 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-colors cursor-pointer"
               title="Поддержка"
             >
               <MessageSquare size={20} />
-            </motion.button>
+            </button>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+            <button
+              type="button"
               onClick={() => setIsFAQModalOpen(true)}
-              className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+              className="p-2 text-zinc-400 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-colors cursor-pointer"
               title="Часто задаваемые вопросы"
             >
               <HelpCircle size={20} />
-            </motion.button>
+            </button>
 
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+            <button
+              type="button"
               onClick={() => setIsHowItWorksOpen(true)}
-              className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+              className="p-2 text-zinc-400 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-colors cursor-pointer"
               title="Как это работает"
             >
               <Info size={20} />
-            </motion.button>
+            </button>
 
             {activeSearches.length > 0 && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-600/30 via-purple-600/30 to-pink-600/30 border border-purple-500/40 rounded-full ml-1 shadow-[0_0_12px_rgba(168,85,247,0.35)]"
-              >
-                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+              <div className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-600/30 via-purple-600/30 to-pink-600/30 border border-purple-500/40 rounded-full ml-1">
+                <div className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
                 <span className="text-[10px] font-bold text-white uppercase tracking-wider">
                   ИИ Поиск...
                 </span>
-              </motion.div>
+              </div>
             )}
 
             {userProfile ? (
-              <motion.button 
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
+              <button 
+                type="button"
                 onClick={() => setIsUserMenuOpen(true)}
-                className="flex items-center gap-2 p-1.5 pl-2 pr-3 bg-gradient-to-r from-zinc-900/80 via-zinc-900/60 to-zinc-800/80 hover:from-zinc-800 hover:to-zinc-700/80 border border-white/10 hover:border-blue-500/30 rounded-full transition-all group ml-1 shadow-md hover:shadow-blue-500/10"
+                className="flex items-center gap-2 p-1.5 pl-2 pr-3 bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 hover:border-blue-500/30 rounded-full transition-colors group ml-1 cursor-pointer"
               >
-                <div className={cn("relative shrink-0 rounded-full p-0.5", isPromoActive ? "pro-avatar-border" : "bg-zinc-800 border border-white/10")}>
+                <div className={cn("relative shrink-0 rounded-full p-0.5", isPromoActive ? "bg-gradient-to-tr from-purple-500 to-pink-500" : "bg-zinc-800 border border-white/10")}>
                   <img 
                     src={auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.nickname}`} 
                     alt="Profile" 
-                    className="w-7 h-7 rounded-full object-cover shadow-sm bg-zinc-900"
+                    className="w-7 h-7 rounded-full object-cover bg-zinc-900"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#000002] rounded-full" />
@@ -209,7 +201,7 @@ export default function Layout() {
                   </span>
                 </div>
                 <ChevronDown size={12} className="text-zinc-500 group-hover:text-zinc-300 transition-colors ml-0.5" />
-              </motion.button>
+              </button>
             ) : null}
           </div>
         </div>

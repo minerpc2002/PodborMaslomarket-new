@@ -18,6 +18,7 @@ import { doc, getDoc, setDoc, runTransaction, Timestamp } from 'firebase/firesto
 import { UserProfile, PromoCode } from '../types';
 
 import { isTelegramWebApp } from '../lib/telegram';
+import { updateQuestProgress } from '../lib/quests';
 
 export default function AuthModal() {
   const { userProfile, isAuthReady, setActivePromoCode, authError } = useAppStore();
@@ -246,6 +247,9 @@ export default function AuthModal() {
         transaction.set(nicknameDocRef, { uid: currentUser.uid });
         transaction.set(doc(db, 'users', currentUser.uid), userProfile);
       });
+
+      // Update registration quest
+      updateQuestProgress(currentUser.uid, 'registration', 1);
 
       // Handle initial promo code if provided
       if (promoInput.trim()) {
