@@ -56,7 +56,7 @@ export default function Home() {
                     </div>
                   </div>
                   <span className="px-2 py-0.5 bg-amber-400/10 text-amber-500 text-[9px] font-black uppercase tracking-wider rounded-md border border-amber-500/20">
-                    pre-Release
+                    v 1.0
                   </span>
                 </div>
                 

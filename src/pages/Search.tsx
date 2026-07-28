@@ -854,17 +854,6 @@ export default function Search() {
 
                 <Card className="border-none shadow-xl liquid-glass rounded-3xl overflow-hidden">
                   <CardContent className="pt-6 space-y-5">
-                    <div className="p-4 bg-amber-900/20 border border-amber-800/60 rounded-2xl flex gap-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-bold text-amber-300">Внимание: pre-Release версия</p>
-                        <p className="text-xs text-amber-400 leading-relaxed">
-                          Поиск по VIN находится в стадии pre-Release.
-                          Рекомендуем проверять результаты или использовать ручной поиск.
-                        </p>
-                      </div>
-                    </div>
-
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-zinc-300 flex items-center justify-between">
                         <span>VIN код автомобиля</span>

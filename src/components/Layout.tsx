@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Search, History, Heart, ShieldCheck, User, Gift, HelpCircle, Info, LayoutDashboard, LogOut, Wrench, X } from 'lucide-react';
+import { Home, Search, History, Heart, ShieldCheck, User, Gift, HelpCircle, Info, LayoutDashboard, LogOut, Wrench, X, ChevronDown, Sparkles, Crown } from 'lucide-react';
 
 import { cn } from '../lib/utils';
 import { useEffect, useState } from 'react';
@@ -132,22 +132,6 @@ export default function Layout() {
           </Link>
           
           <div className="flex items-center gap-1 shrink-0">
-            {isStaff && (
-              <Link to="/dashboard">
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  className={cn(
-                    "p-2 transition-colors",
-                    location.pathname === '/dashboard' ? "text-blue-400" : "text-zinc-400 hover:text-blue-600"
-                  )}
-                  title="Личный кабинет (Админ)"
-                >
-                  <LayoutDashboard size={20} />
-                </motion.button>
-              </Link>
-            )}
-
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -193,28 +177,38 @@ export default function Layout() {
 
             {userProfile ? (
               <motion.button 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => setIsUserMenuOpen(true)}
-                className="flex items-center gap-2.5 p-1.5 pr-3 bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 rounded-full transition-all group ml-1"
+                className="flex items-center gap-2 p-1.5 pl-2 pr-3 bg-gradient-to-r from-zinc-900/80 via-zinc-900/60 to-zinc-800/80 hover:from-zinc-800 hover:to-zinc-700/80 border border-white/10 hover:border-blue-500/30 rounded-full transition-all group ml-1 shadow-md hover:shadow-blue-500/10"
               >
-                <div className={cn("relative shrink-0", isPromoActive && "pro-avatar-border")}>
+                <div className={cn("relative shrink-0 rounded-full p-0.5", isPromoActive ? "pro-avatar-border" : "bg-zinc-800 border border-white/10")}>
                   <img 
                     src={auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.nickname}`} 
                     alt="Profile" 
-                    className="w-8 h-8 rounded-full border border-white/10 object-cover shadow-sm"
+                    className="w-7 h-7 rounded-full object-cover shadow-sm bg-zinc-900"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#000002] rounded-full" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#000002] rounded-full" />
                 </div>
-                <div className="flex flex-col items-start leading-none">
-                  <span className="text-xs font-bold text-zinc-100 group-hover:text-blue-400 transition-colors">
-                    {userProfile.nickname}
-                  </span>
-                  <span className="text-[9px] text-zinc-500 uppercase tracking-tighter mt-0.5">
+                <div className="flex flex-col items-start leading-none pr-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-zinc-100 group-hover:text-blue-400 transition-colors max-w-[80px] sm:max-w-[120px] truncate">
+                      {userProfile.nickname}
+                    </span>
+                  </div>
+                  <span className={cn(
+                    "text-[8px] font-black uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded-sm",
+                    userProfile.role === 'admin' 
+                      ? "text-amber-400 bg-amber-400/10" 
+                      : isPromoActive 
+                        ? "text-purple-400 bg-purple-400/10" 
+                        : "text-zinc-400 bg-zinc-800"
+                  )}>
                     {userProfile.role === 'admin' ? 'Admin' : isPromoActive ? 'Pro' : 'User'}
                   </span>
                 </div>
+                <ChevronDown size={12} className="text-zinc-500 group-hover:text-zinc-300 transition-colors ml-0.5" />
               </motion.button>
             ) : null}
           </div>
